@@ -888,100 +888,100 @@ table.tbl tbody tr:hover { background: var(--acc-soft) }
 <div class="wrap">
 
 <!-- ═══ DASHBOARD ═══ -->
-<div class=”page act” id=”pg-dash”>
+<div class="page act" id="pg-dash">
 
   <!-- ── HERO ── -->
-  <div style=”background:linear-gradient(135deg,#0a0a0a 0%,#1a1a2e 60%,#0d2818 100%);border-radius:18px;padding:22px 24px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;box-shadow:0 4px 24px rgba(0,0,0,.25)”>
+  <div style="background:linear-gradient(135deg,#0a0a0a 0%,#1a1a2e 60%,#0d2818 100%);border-radius:18px;padding:22px 24px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;box-shadow:0 4px 24px rgba(0,0,0,.25)">
     <div>
-      <div style=”font-size:22px;font-weight:900;color:#fff;letter-spacing:-.4px”>Buenos días, <span style=”color:var(--acc)”>Raúl</span> 👋</div>
-      <div id=”dashHeroSub” style=”font-size:13px;color:rgba(255,255,255,.5);margin-top:4px”>Cargando resumen…</div>
+      <div style="font-size:22px;font-weight:900;color:#fff;letter-spacing:-.4px">Buenos días, <span style="color:var(--acc)">Raúl</span> 👋</div>
+      <div id="dashHeroSub" style="font-size:13px;color:rgba(255,255,255,.5);margin-top:4px">Cargando resumen…</div>
     </div>
-    <button class=”btn btn-p” onclick=”openNewCot()” style=”font-size:14px;padding:11px 24px;font-weight:800”>＋ Nueva cotización</button>
+    <button class="btn btn-p" onclick="openNewCot()" style="font-size:14px;padding:11px 24px;font-weight:800">＋ Nueva cotización</button>
   </div>
 
   <!-- ── KPIs OPERACIONALES ── -->
-  <div style=”display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px” id=”opsCards”>
-    <div class=”stat” style=”border-top-color:var(--success)”><div class=”n” style=”color:#15803d” id=”ok_venta_mes”>—</div><div class=”l”>💰 Vendido este mes</div></div>
-    <div class=”stat” style=”border-top-color:var(--info)”><div class=”n” style=”color:var(--info)” id=”ok_por_cobrar”>—</div><div class=”l”>🏦 Por cobrar</div></div>
-    <div class=”stat” style=”border-top-color:#f59e0b”><div class=”n” style=”color:#d97706” id=”ok_enviadas”>—</div><div class=”l”>📤 Enviadas</div></div>
-    <div class=”stat” style=”border-top-color:#a78bfa”><div class=”n” style=”color:#7c3aed” id=”ok_borradores”>—</div><div class=”l”>📝 Borradores</div></div>
-    <div class=”stat” style=”border-top-color:var(--danger)” id=”ok_alertas_card”><div class=”n” style=”color:var(--danger)” id=”ok_alertas”>—</div><div class=”l”>⚠ Alertas</div></div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px" id="opsCards">
+    <div class="stat" style="border-top-color:var(--success)"><div class="n" style="color:#15803d" id="ok_venta_mes">—</div><div class="l">💰 Vendido este mes</div></div>
+    <div class="stat" style="border-top-color:var(--info)"><div class="n" style="color:var(--info)" id="ok_por_cobrar">—</div><div class="l">🏦 Por cobrar</div></div>
+    <div class="stat" style="border-top-color:#f59e0b"><div class="n" style="color:#d97706" id="ok_enviadas">—</div><div class="l">📤 Enviadas</div></div>
+    <div class="stat" style="border-top-color:#a78bfa"><div class="n" style="color:#7c3aed" id="ok_borradores">—</div><div class="l">📝 Borradores</div></div>
+    <div class="stat" style="border-top-color:var(--danger)" id="ok_alertas_card"><div class="n" style="color:var(--danger)" id="ok_alertas">—</div><div class="l">⚠ Alertas</div></div>
   </div>
 
   <!-- ── META MENSUAL ── -->
-  <div class=”card” id=”dashMetaBox” style=”margin-bottom:14px;display:none”>
-    <div style=”display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:8px;flex-wrap:wrap”>
-      <h2 style=”margin:0”>🎯 Meta mensual</h2>
-      <div id=”dashMetaLabel” style=”font-size:13px;font-weight:700;color:var(--txtL)”></div>
+  <div class="card" id="dashMetaBox" style="margin-bottom:14px;display:none">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:8px;flex-wrap:wrap">
+      <h2 style="margin:0">🎯 Meta mensual</h2>
+      <div id="dashMetaLabel" style="font-size:13px;font-weight:700;color:var(--txtL)"></div>
     </div>
-    <div style=”background:var(--brd-light);border-radius:99px;height:12px;overflow:hidden”>
-      <div id=”dashMetaBar” style=”height:100%;border-radius:99px;background:linear-gradient(90deg,var(--acc),var(--acc2));transition:width .6s cubic-bezier(.4,0,.2,1);width:0%”></div>
+    <div style="background:var(--brd-light);border-radius:99px;height:12px;overflow:hidden">
+      <div id="dashMetaBar" style="height:100%;border-radius:99px;background:linear-gradient(90deg,var(--acc),var(--acc2));transition:width .6s cubic-bezier(.4,0,.2,1);width:0%"></div>
     </div>
-    <div id=”dashMetaSub” style=”font-size:11px;color:var(--txtL);margin-top:6px”></div>
+    <div id="dashMetaSub" style="font-size:11px;color:var(--txtL);margin-top:6px"></div>
   </div>
 
   <!-- ── EMBUDO + ALERTAS ── -->
-  <div class=”grid-2c” id=”dashExtras” style=”margin-bottom:14px”>
-    <div class=”card”>
-      <h2 style=”margin-bottom:12px”>📊 Pipeline de ventas</h2>
-      <div id=”dashPipeline”><div style=”color:var(--txtL);font-size:12px”>Cargando…</div></div>
+  <div class="grid-2c" id="dashExtras" style="margin-bottom:14px">
+    <div class="card">
+      <h2 style="margin-bottom:12px">📊 Pipeline de ventas</h2>
+      <div id="dashPipeline"><div style="color:var(--txtL);font-size:12px">Cargando…</div></div>
     </div>
-    <div class=”card”>
-      <h2 style=”margin-bottom:12px”>🔔 Alertas del día</h2>
-      <div id=”dashAlertas”><div style=”color:var(--txtL);font-size:12px”>Cargando…</div></div>
+    <div class="card">
+      <h2 style="margin-bottom:12px">🔔 Alertas del día</h2>
+      <div id="dashAlertas"><div style="color:var(--txtL);font-size:12px">Cargando…</div></div>
     </div>
   </div>
 
   <!-- ── ACTIVIDAD + TOP ── -->
-  <div class=”grid-2c” style=”margin-bottom:14px”>
-    <div class=”card”>
-      <h2 style=”margin-bottom:12px”>🕐 Actividad reciente</h2>
-      <div id=”dashActividad”><div style=”color:var(--txtL);font-size:12px”>Cargando…</div></div>
+  <div class="grid-2c" style="margin-bottom:14px">
+    <div class="card">
+      <h2 style="margin-bottom:12px">🕐 Actividad reciente</h2>
+      <div id="dashActividad"><div style="color:var(--txtL);font-size:12px">Cargando…</div></div>
     </div>
-    <div class=”card”>
-      <h2 style=”margin-bottom:8px”>🏆 Top del mes (Aprobadas)</h2>
-      <div id=”dashTopBox” style=”font-size:12px;color:var(--txtL)”>Cargando…</div>
+    <div class="card">
+      <h2 style="margin-bottom:8px">🏆 Top del mes (Aprobadas)</h2>
+      <div id="dashTopBox" style="font-size:12px;color:var(--txtL)">Cargando…</div>
     </div>
   </div>
 
   <!-- ── BI FINANCIERO ── -->
-  <div class=”card” style=”margin-bottom:14px”>
-    <div style=”display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:12px”>
-      <h2 style=”margin:0”>📈 Análisis financiero (BI)</h2>
-      <div style=”display:flex;gap:6px;flex-wrap:wrap”>
-        <button class=”btn btn-o btn-sm” onclick=”setDashScope('ALL')” id=”scopeAll”>Todas</button>
-        <button class=”btn btn-o btn-sm” onclick=”setDashScope('APROBADA')” id=”scopeAprobada”>Solo aprobadas</button>
-        <span style=”width:1px;height:20px;background:var(--brd);align-self:center”></span>
-        <button class=”btn btn-o btn-sm” onclick=”setDashPeriod('week')”>Semana</button>
-        <button class=”btn btn-o btn-sm” onclick=”setDashPeriod('month')”>Mes</button>
-        <button class=”btn btn-o btn-sm” onclick=”setDashPeriod('quarter')”>Trimestre</button>
-        <button class=”btn btn-o btn-sm” onclick=”setDashPeriod('year')”>Año</button>
+  <div class="card" style="margin-bottom:14px">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+      <h2 style="margin:0">📈 Análisis financiero (BI)</h2>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn btn-o btn-sm" onclick="setDashScope('ALL')" id="scopeAll">Todas</button>
+        <button class="btn btn-o btn-sm" onclick="setDashScope('APROBADA')" id="scopeAprobada">Solo aprobadas</button>
+        <span style="width:1px;height:20px;background:var(--brd);align-self:center"></span>
+        <button class="btn btn-o btn-sm" onclick="setDashPeriod('week')">Semana</button>
+        <button class="btn btn-o btn-sm" onclick="setDashPeriod('month')">Mes</button>
+        <button class="btn btn-o btn-sm" onclick="setDashPeriod('quarter')">Trimestre</button>
+        <button class="btn btn-o btn-sm" onclick="setDashPeriod('year')">Año</button>
       </div>
     </div>
-    <div class=”stats” id=”biCards” style=”margin-bottom:14px”></div>
-    <h2 id=”salesTitle” style=”margin-bottom:8px;font-size:14px”>📈 Ventas</h2>
-    <canvas id=”salesChart” height=”110” style=”width:100%”></canvas>
+    <div class="stats" id="biCards" style="margin-bottom:14px"></div>
+    <h2 id="salesTitle" style="margin-bottom:8px;font-size:14px">📈 Ventas</h2>
+    <canvas id="salesChart" height="110" style="width:100%"></canvas>
   </div>
 
-  <div class=”grid-2c” id=”biCharts”>
-    <div class=”card”>
-      <h2 style=”margin-bottom:8px”>Ventas por Categoría</h2>
-      <canvas id=”deptBar” height=”180” style=”width:100%”></canvas>
+  <div class="grid-2c" id="biCharts">
+    <div class="card">
+      <h2 style="margin-bottom:8px">Ventas por Categoría</h2>
+      <canvas id="deptBar" height="180" style="width:100%"></canvas>
     </div>
-    <div class=”card”>
-      <h2 style=”margin-bottom:8px”>Participación en Ventas</h2>
-      <canvas id=”deptDonut” height=”180” style=”width:100%”></canvas>
+    <div class="card">
+      <h2 style="margin-bottom:8px">Participación en Ventas</h2>
+      <canvas id="deptDonut" height="180" style="width:100%"></canvas>
     </div>
   </div>
 
-  <div class=”card” style=”margin-top:14px”>
-    <h2 style=”margin-bottom:8px”>Margen Bruto (%) por Categoría</h2>
-    <canvas id=”marginBar” height=”170” style=”width:100%”></canvas>
+  <div class="card" style="margin-top:14px">
+    <h2 style="margin-bottom:8px">Margen Bruto (%) por Categoría</h2>
+    <canvas id="marginBar" height="170" style="width:100%"></canvas>
   </div>
 
-  <div class=”card” style=”margin-top:14px”>
-    <h2 style=”margin-bottom:8px”>Detalle por Categoría</h2>
-    <div class=”tbl-wrap”><table class=”dt” id=”deptTable”><thead></thead><tbody></tbody></table></div>
+  <div class="card" style="margin-top:14px">
+    <h2 style="margin-bottom:8px">Detalle por Categoría</h2>
+    <div class="tbl-wrap"><table class="dt" id="deptTable"><thead></thead><tbody></tbody></table></div>
   </div>
 </div>
 
