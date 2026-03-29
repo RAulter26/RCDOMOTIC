@@ -1392,12 +1392,17 @@ async function loadDashOps(){
   const d=await api('/api/stats/ops');
   if(!d||d.ok===false) return;
 
-  // KPI cards
+  // Convertir pipeline array → dict {ESTADO: count}
+  const pl={};
+  (d.pipeline||[]).forEach(r=>{ pl[r.estado]=r.cnt||0; });
+
   const fmt2=v=>Number(v||0).toLocaleString('es-CO',{style:'currency',currency:'COP',maximumFractionDigits:0});
+
+  // KPI cards
   $('#ok_venta_mes').textContent=fmt2(d.venta_mes);
   $('#ok_por_cobrar').textContent=fmt2(d.por_cobrar);
-  $('#ok_enviadas').textContent=(d.pipeline?.ENVIADA||0);
-  $('#ok_borradores').textContent=(d.pipeline?.BORRADOR||0);
+  $('#ok_enviadas').textContent=(pl.ENVIADA||0);
+  $('#ok_borradores').textContent=(pl.BORRADOR||0);
   const nAlertas=Number(d.total_alertas||0);
   $('#ok_alertas').textContent=nAlertas;
   const ac=$('#ok_alertas_card');
@@ -1406,7 +1411,7 @@ async function loadDashOps(){
   // Hero subtitle
   const sub=$('#dashHeroSub');
   if(sub){
-    const pend=(d.pipeline?.ENVIADA||0)+(d.pipeline?.BORRADOR||0);
+    const pend=(pl.ENVIADA||0)+(pl.BORRADOR||0);
     sub.textContent=`${pend} cot. en progreso · ${fmt2(d.por_cobrar)} por cobrar${nAlertas>0?' · ⚠ '+nAlertas+' alerta'+(nAlertas>1?'s':''):''}`;
   }
 
@@ -1426,25 +1431,25 @@ async function loadDashOps(){
   const pipe=$('#dashPipeline');
   if(pipe){
     const estados=[['BORRADOR','📝','#a78bfa'],['ENVIADA','📤','#f59e0b'],['APROBADA','✅','#22c55e'],['RECHAZADA','❌','#ef4444'],['CANCELADA','🚫','#64748b']];
-    const total=estados.reduce((s,[e])=>s+(d.pipeline?.[e]||0),0)||1;
+    const totalPl=estados.reduce((s,[e])=>s+(pl[e]||0),0)||1;
     pipe.innerHTML=`<div style="display:grid;gap:6px">`+estados.map(([e,ic,col])=>{
-      const n=d.pipeline?.[e]||0;
-      const pct=Math.round(n/total*100);
+      const n=pl[e]||0;
+      const pct=Math.round(n/totalPl*100);
       return `<div style="display:grid;grid-template-columns:90px 1fr 36px;align-items:center;gap:8px;font-size:12px">
         <div style="color:${col};font-weight:700">${ic} ${e}</div>
         <div style="background:var(--brd-light);border-radius:99px;height:8px;overflow:hidden"><div style="height:100%;border-radius:99px;background:${col};width:${pct}%;transition:width .5s"></div></div>
         <div style="text-align:right;font-weight:900">${n}</div>
       </div>`;
-    }).join('')+`<div style="font-size:11px;color:var(--txtL);text-align:right;margin-top:2px">Total: ${total} cotizaciones</div></div>`;
+    }).join('')+`<div style="font-size:11px;color:var(--txtL);text-align:right;margin-top:2px">Total: ${totalPl} cotizaciones</div></div>`;
   }
 
   // Alertas
   const alertBox=$('#dashAlertas');
   if(alertBox){
     const items=[];
-    (d.alertas_sin_respuesta||[]).forEach(a=>items.push({tipo:'sin_resp',label:`<b>${escapeHtml(a.cliente||'?')}</b> — cot. #${a.numero||a.id} enviada hace ${a.dias||'?'}d sin respuesta`,color:'#ef4444'}));
-    (d.alertas_por_vencer||[]).forEach(a=>items.push({tipo:'vencer',label:`<b>${escapeHtml(a.cliente||'?')}</b> — cot. #${a.numero||a.id} vence en ${a.dias_restantes||'?'}d`,color:'#f59e0b'}));
-    (d.recien_aprobadas||[]).forEach(a=>items.push({tipo:'aprobada',label:`<b>${escapeHtml(a.cliente||'?')}</b> — cot. #${a.numero||a.id} aprobada ✅`,color:'#22c55e'}));
+    (d.alertas_sin_respuesta||[]).forEach(a=>items.push({label:`<b>${escapeHtml(a.cliente||'?')}</b> — #${a.no_cotizacion||a.id} enviada, sin respuesta`,color:'#ef4444'}));
+    (d.alertas_por_vencer||[]).forEach(a=>items.push({label:`<b>${escapeHtml(a.cliente||'?')}</b> — #${a.no_cotizacion||a.id} próxima a vencer`,color:'#f59e0b'}));
+    (d.recien_aprobadas||[]).forEach(a=>items.push({label:`<b>${escapeHtml(a.cliente||'?')}</b> — #${a.no_cotizacion||a.id} aprobada ✅`,color:'#22c55e'}));
     if(items.length===0){
       alertBox.innerHTML=`<div style="text-align:center;padding:20px 0;color:var(--txtL);font-size:12px">✅ Sin alertas pendientes</div>`;
     } else {
@@ -1462,10 +1467,10 @@ async function loadDashOps(){
       const estadoColor={BORRADOR:'#a78bfa',ENVIADA:'#f59e0b',APROBADA:'#22c55e',RECHAZADA:'#ef4444',CANCELADA:'#64748b'};
       actBox.innerHTML=`<div style="display:grid;gap:5px">`+acts.map(a=>{
         const col=estadoColor[a.estado]||'#94a3b8';
-        const fecha=a.updated_at?(new Date(a.updated_at+'Z').toLocaleDateString('es-CO',{day:'2-digit',month:'short'})):'';
+        const fecha=a.fecha?(new Date(a.fecha).toLocaleDateString('es-CO',{day:'2-digit',month:'short'})):'';
         return `<div style="display:flex;align-items:center;gap:8px;font-size:12px;padding:6px 8px;border-radius:8px;background:var(--bg2)">
           <div style="width:8px;height:8px;border-radius:50%;background:${col};flex-shrink:0"></div>
-          <div style="flex:1;min-width:0"><span style="font-weight:700">${escapeHtml(a.cliente||'Sin cliente')}</span><span style="opacity:.6;margin-left:6px">#${a.numero||a.id}</span></div>
+          <div style="flex:1;min-width:0"><span style="font-weight:700">${escapeHtml(a.cliente||'Sin cliente')}</span><span style="opacity:.6;margin-left:6px">#${a.no_cotizacion||a.id}</span></div>
           <div style="font-weight:700;color:${col};white-space:nowrap">${a.estado}</div>
           <div style="opacity:.5;white-space:nowrap">${fecha}</div>
         </div>`;
