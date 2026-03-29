@@ -771,6 +771,86 @@ table.tbl tbody tr:hover { background: var(--acc-soft) }
 }
 @keyframes tipIn { from { opacity: 0; transform: translateX(-50%) translateY(4px) } to { opacity: 1; transform: translateX(-50%) translateY(0) } }
 
+/* ─── COT FULL PAGE EDITOR ─── */
+.cot-editor-hdr {
+  background: linear-gradient(135deg,#0a0a0a 0%,#1a1a2e 100%);
+  border-radius: var(--R-xl);
+  padding: 14px 20px;
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 16px;
+  box-shadow: 0 4px 20px rgba(0,0,0,.25);
+  position: sticky; top: 56px; z-index: 100;
+}
+.cot-editor-hdr h2 {
+  flex: 1; font-size: 19px; font-weight: 900; color: #fff; letter-spacing: -.3px;
+}
+.cot-editor-hdr .no-cot {
+  font-size: 12px; font-weight: 600; color: rgba(255,255,255,.45);
+  background: rgba(255,255,255,.06); padding: 4px 10px; border-radius: 99px;
+}
+.cot-editor-grid {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: 16px;
+  align-items: start;
+}
+@media(max-width:1100px) { .cot-editor-grid { grid-template-columns: 1fr } }
+.cot-section {
+  background: var(--card);
+  border-radius: var(--R-xl);
+  border: 1px solid var(--brd-light);
+  box-shadow: var(--S);
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+.cot-section:last-child { margin-bottom: 0 }
+.cot-section-hdr {
+  background: linear-gradient(135deg,#f8f9fa,#f1f3f5);
+  padding: 10px 16px;
+  font-size: 10.5px; font-weight: 800; letter-spacing: .6px;
+  text-transform: uppercase; color: #4b5563;
+  border-bottom: 1px solid var(--brd-light);
+  display: flex; align-items: center; gap: 6px;
+}
+.cot-section-body { padding: 14px 16px }
+
+/* ─── COT LIST TABLE ─── */
+.cot-table-row {
+  display: grid;
+  grid-template-columns: 130px 1fr 140px 110px 120px auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--brd-light);
+  transition: background var(--transition);
+}
+.cot-table-row:last-child { border-bottom: none }
+.cot-table-row:hover { background: var(--acc-soft) }
+.cot-table-hdr {
+  display: grid;
+  grid-template-columns: 130px 1fr 140px 110px 120px auto;
+  gap: 12px;
+  align-items: center;
+  padding: 8px 16px;
+  border-bottom: 2px solid var(--brd);
+  background: linear-gradient(135deg,#f8f9fa,#f1f3f5);
+  font-size: 10px; font-weight: 800; letter-spacing: .6px;
+  text-transform: uppercase; color: var(--txtL);
+  border-radius: var(--R-lg) var(--R-lg) 0 0;
+}
+@media(max-width:900px) {
+  .cot-table-hdr { display: none }
+  .cot-table-row { grid-template-columns: 1fr auto; grid-template-rows: auto auto; gap: 6px 12px }
+}
+
+/* ─── STAT UPGRADE ─── */
+.stat-icon { font-size: 22px; margin-bottom: 6px; display: block }
+.stat.green { border-top-color: var(--success) }
+.stat.green .n { color: #15803d }
+.stat.purple { border-top-color: #8b5cf6 }
+.stat.purple .n { color: #7c3aed }
+.stat.purple::after { background: linear-gradient(to bottom, rgba(139,92,246,.03), transparent) }
+
 /* ─── LOGIN INPUT ─── */
 .inp {
   width: 100%;
@@ -1048,11 +1128,24 @@ table.tbl tbody tr:hover { background: var(--acc-soft) }
 <div class="overlay" id="ovShare"><div class="modal"><div class="modal-hdr"><h3>📤 Compartir</h3><button class="close" onclick="closeModal('ovShare')">&times;</button></div><div class="modal-body" id="shareBody"></div></div></div>
 
 
-<!-- MODAL: Cotización -->
-<div class="overlay" id="ovCot"><div class="modal modal-lg" style="max-height:95vh"><div class="modal-hdr"><h3 id="cotModalTitle">Nueva Cotización</h3><button class="close" onclick="closeModal('ovCot')">&times;</button></div><div class="modal-body" style="padding:10px">
-  <button class="btn btn-o btn-sm" style="margin-bottom:6px;display:none" id="btnTogglePreview" onclick="togglePreview()">👁 Vista Previa</button>
-  <div class="split"><div class="col" id="cotFormCol"></div><div class="col col-preview" id="cotPreviewCol"><div class="preview" id="livePreview"></div></div></div>
-</div></div></div>
+<!-- ═══ COTIZACIÓN EDITOR — PÁGINA COMPLETA ═══ -->
+<div class="page" id="pg-cot-editor">
+  <div class="cot-editor-hdr">
+    <button class="btn btn-sm" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18);color:#fff;font-weight:700" onclick="closeCotEditor()">← Volver</button>
+    <h2 id="cotEditorTitle">Nueva Cotización</h2>
+    <span class="no-cot" id="cotEditorNo"></span>
+    <button class="btn btn-p" onclick="saveCot()" style="font-size:13px;padding:9px 20px">💾 Guardar</button>
+  </div>
+  <div class="cot-editor-grid">
+    <div id="cotFormCol"></div>
+    <div style="position:sticky;top:120px">
+      <div class="cot-section">
+        <div class="cot-section-hdr">👁 Vista previa en tiempo real</div>
+        <div class="cot-section-body" style="padding:12px"><div class="preview" id="livePreview" style="border:none;padding:0"></div></div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- MODAL: Producto -->
 <div class="overlay" id="ovProd"><div class="modal"><div class="modal-hdr"><h3 id="prodModalTitle">Producto</h3><button class="close" onclick="closeModal('ovProd')">&times;</button></div><div class="modal-body" id="prodFormBody"></div></div></div>
@@ -1106,6 +1199,7 @@ const cmdTemplate=`{\n  "cliente": "",\n  "proyecto": "",\n  "ciudad": "Sincelej
 let PARAMS={}, CATALOGO=[], CATEGORIAS=[], COT_ITEMS=[], COT_EDIT_ID=null;
 let ME=null, PRICE_LISTS=[];
 let CSRF_TOKEN='';
+let PREV_PAGE='cots';
 
 function showLogin(msg=''){ $('#loginMask').style.display='flex'; $('#loginErr').style.display = msg? 'block':'none'; $('#loginErr').textContent = msg; setTimeout(()=>$('#loginUser').focus(),50)}
 function hideLogin(){ $('#loginMask').style.display='none'; $('#loginErr').style.display='none'; $('#loginErr').textContent=''; }
@@ -1194,7 +1288,8 @@ function goPage(p){
   $$('.page').forEach(e=>e.classList.remove('act'));$(`#pg-${p}`).classList.add('act');
   const btns=$$('#mainNav button');btns.forEach(b=>b.classList.remove('act'));
   const map={dash:0,cots:1,cat:2,cmd:3,inv:4,buy:5,crm:6,packs:7,config:8};
-  if(btns[map[p]])btns[map[p]].classList.add('act');
+  if(p==='cot-editor'){ /* no nav highlight for editor */ }
+  else if(btns[map[p]])btns[map[p]].classList.add('act');
   if(p==='dash')loadDash();
   if(p==='cots')loadCots();
   if(p==='cat')loadCat();
@@ -1509,45 +1604,48 @@ async function loadCots(){
     wrap.innerHTML='<p style="color:#999;font-size:12px">Sin cotizaciones.</p>';
     return;
   }
-  wrap.innerHTML=`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px">${
-    cots.map(c=>{
-      const est=c.estado||'BORRADOR';
-      const color={BORRADOR:'#777',ENVIADA:'#1e88e5',APROBADA:'#1b5e20',RECHAZADA:'#b71c1c'}[est]||'#444';
-      const mg = Number(c.margen_neto_sin_iva||0);
-      const util = Number(c.utilidad_neta||0);
-      const costosOk = (c.costos_ok===true || c.costos_ok===1);
-      const mgCol = !costosOk ? '#6b7280' : (mg>=0.30 ? '#15803d' : (mg>=0.20 ? '#f59e0b' : '#dc2626'));
-      return `
-      <div style="border:1.5px solid var(--brd-light);border-radius:var(--R-lg);padding:16px;background:#fff;box-shadow:var(--S);transition:all .2s;cursor:default" onmouseenter="this.style.boxShadow='var(--S-md)';this.style.transform='translateY(-1px)'" onmouseleave="this.style.boxShadow='var(--S)';this.style.transform='none'">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
-          <div>
-            <div style="font-size:17px;font-weight:900;color:var(--txt);letter-spacing:-.3px">${c.no_cotizacion}</div>
-            <div style="font-size:12px;color:var(--txtL);margin-top:2px">${c.fecha||''} · ${escapeHtml(c.ciudad||'')}</div>
-          </div>
-          <div style="text-align:right">
-            <div style="font-size:16px;font-weight:900;letter-spacing:-.3px">${fmt(c.total_final)}</div>
-            <div style="margin-top:4px;font-size:11px;font-weight:700;color:${mgCol}">
-              ${costosOk ? `Rentab. ${fmt(util)} (${pct(mg*100)})` : '⚠ Sin costos'}
-            </div>
-            <div style="margin-top:5px"><span class="badge badge-${est}">${est}</span></div>
-          </div>
-        </div>
-        <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--brd-light)">
-          <div style="font-weight:700;font-size:14px">${escapeHtml(c.cliente||'')}</div>
-          <div style="font-size:12px;color:var(--txtL);margin-top:1px">${escapeHtml(c.proyecto||'')}</div>
-        </div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px">
-          <button class="btn btn-o btn-sm" onclick="verCot(${c.id})">👁 Ver</button>
-          <button class="btn btn-o btn-sm" onclick="editCot(${c.id})">✏️ Editar</button>
-          <button class="btn btn-s btn-sm" onclick="window.open('/print/${c.id}','_blank')">🖨 PDF</button>
-          <button class="btn btn-o btn-sm" onclick="openShare(${c.id})">📤</button>
-          <button class="btn btn-d btn-sm" onclick="delCot(${c.id})">🗑</button>
-        </div>
-      </div>`;
-    }).join('')
-  }</div>`;
+  const statusOrder = {BORRADOR:0,ENVIADA:1,NEGOCIACION:2,APROBADA:3,RECHAZADA:4};
+  wrap.innerHTML=`
+  <div class="cot-table-hdr">
+    <span>N° Cotización</span><span>Cliente / Proyecto</span><span>Total</span><span>Rentabilidad</span><span>Estado</span><span>Acciones</span>
+  </div>
+  ${cots.map(c=>{
+    const est=c.estado||'BORRADOR';
+    const estIcon={BORRADOR:'○',ENVIADA:'◉',APROBADA:'✓',RECHAZADA:'✕'}[est]||'○';
+    const estCol={BORRADOR:'var(--txtL)',ENVIADA:'var(--info)',APROBADA:'var(--success)',RECHAZADA:'var(--danger)'}[est]||'var(--txtL)';
+    const mg=Number(c.margen_neto_sin_iva||0);
+    const util=Number(c.utilidad_neta||0);
+    const costosOk=(c.costos_ok===true||c.costos_ok===1);
+    const mgCol=!costosOk?'var(--txtXL)':(mg>=0.30?'#15803d':(mg>=0.20?'#d97706':'#dc2626'));
+    return `<div class="cot-table-row">
+      <div>
+        <div style="font-size:14px;font-weight:900;letter-spacing:-.2px;color:var(--txt)">${c.no_cotizacion}</div>
+        <div style="font-size:10.5px;color:var(--txtL);margin-top:2px">${c.fecha||''} ${c.ciudad?'· '+escapeHtml(c.ciudad):''}</div>
+      </div>
+      <div style="min-width:0">
+        <div style="font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(c.cliente||'')}</div>
+        <div style="font-size:11px;color:var(--txtL);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(c.proyecto||'—')}</div>
+      </div>
+      <div>
+        <div style="font-size:14px;font-weight:900">${fmt(c.total_final)}</div>
+      </div>
+      <div style="font-size:11px;font-weight:700;color:${mgCol}">
+        ${costosOk?`${pct(mg*100)}<br><span style="font-weight:500;font-size:10px">${fmt(util)}</span>`:'<span style="color:var(--txtXL)">Sin costos</span>'}
+      </div>
+      <div>
+        <span class="badge badge-${est}" style="display:inline-flex;align-items:center;gap:4px"><span style="color:${estCol}">${estIcon}</span>${est}</span>
+      </div>
+      <div style="display:flex;gap:4px;flex-wrap:wrap">
+        <button class="btn btn-o btn-sm" onclick="verCot(${c.id})" title="Ver detalle">👁</button>
+        <button class="btn btn-o btn-sm" onclick="editCot(${c.id})" title="Editar">✏️</button>
+        <button class="btn btn-s btn-sm" onclick="window.open('/print/${c.id}','_blank')" title="PDF">🖨</button>
+        <button class="btn btn-o btn-sm" onclick="openShare(${c.id})" title="Compartir">📤</button>
+        <button class="btn btn-d btn-sm" onclick="delCot(${c.id})" title="Eliminar">🗑</button>
+      </div>
+    </div>`;
+  }).join('')}`;
 }
-async function delCot(id){if(!confirm('¿Eliminar?'))return;await api(`/api/cotizaciones/${id}`,{method:'DELETE'});toast('Eliminada');loadCots()}
+async function delCot(id){if(!confirm('¿Eliminar cotización? Esta acción no se puede deshacer.'))return;const r=await api(`/api/cotizaciones/${id}`,{method:'DELETE'});if(r&&r.ok===false){toast('❌ Error: '+(r.error||'No se pudo eliminar'));return;}toast('🗑 Eliminada');loadCots()}
 
 /* ═══════════ VER DETALLE ═══════════ */
 async function verCot(id){
@@ -1733,13 +1831,28 @@ async function openShare(id){
   openModal('ovShare');
 }
 
+function closeCotEditor(){goPage(PREV_PAGE||'cots');if(PREV_PAGE==='cots')loadCots();}
+
 /* ═══════════ CREAR/EDITAR COT ═══════════ */
-function openNewCot(){COT_EDIT_ID=null;COT_ITEMS=[];renderCotForm({});openModal('ovCot');$('#cotModalTitle').textContent='Nueva Cotización';updatePreview()}
+function openNewCot(){
+  PREV_PAGE=CURRENT_PAGE;
+  COT_EDIT_ID=null;COT_ITEMS=[];
+  renderCotForm({});
+  goPage('cot-editor');
+  $('#cotEditorTitle').textContent='Nueva Cotización';
+  $('#cotEditorNo').textContent='';
+  updatePreview();
+}
 async function editCot(id){
+  PREV_PAGE=CURRENT_PAGE;
   const c=await api(`/api/cotizaciones/${id}`);COT_EDIT_ID=id;
   COT_ITEMS=(c.items||[]).map(it=>({id_producto:it.id_producto,cantidad:it.cantidad,precio_manual:it.precio_manual,inst_manual:it.inst_manual,cfg_manual:it.cfg_manual,notas_item:it.notas_item||'',
     nombre:it.nombre,descripcion:it.descripcion,unidad:it.unidad,precio:it.precio,aplica_iva:it.aplica_iva,pct_iva:it.pct_iva,inst_default:it.inst_default,config_default:it.config_default,imagen_url:it.imagen_url||''}));
-  renderCotForm(c);openModal('ovCot');$('#cotModalTitle').textContent=`Editar ${c.no_cotizacion}`;updatePreview();
+  renderCotForm(c);
+  goPage('cot-editor');
+  $('#cotEditorTitle').textContent=`Editando cotización`;
+  $('#cotEditorNo').textContent=c.no_cotizacion||'';
+  updatePreview();
 }
 function renderCotForm(c){
   const catOpts=CATEGORIAS.map(cat=>`<option>${cat}</option>`).join('');
@@ -1763,48 +1876,89 @@ function renderCotForm(c){
   }
 
   const chkHtml = checklist.map((x,i)=>
-    `<label style="display:flex;gap:8px;align-items:center;padding:8px 10px;border:1px solid rgba(255,255,255,.08);border-radius:12px;background:rgba(0,0,0,.12)">
-       <input type="checkbox" data-idx="${i}" ${x.done?'checked':''} onchange="updatePreview()">
-       <span style="font-size:13px">${x.label}</span>
+    `<label style="display:flex;gap:8px;align-items:center;padding:9px 12px;border:1.5px solid var(--brd-light);border-radius:10px;background:var(--card);cursor:pointer;transition:border-color .15s" onmouseenter="this.style.borderColor='var(--acc)'" onmouseleave="this.style.borderColor='var(--brd-light)'">
+       <input type="checkbox" data-idx="${i}" ${x.done?'checked':''} onchange="updatePreview()" style="accent-color:var(--acc);width:15px;height:15px">
+       <span style="font-size:12.5px;font-weight:600">${x.label}</span>
      </label>`
   ).join('');
   $('#cotFormCol').innerHTML=`
-    <div class="row r2"><div class="fg"><label>Cliente *</label><input id="cf_cli" value="${c.cliente||''}" oninput="updatePreview()"></div>
-    <div class="fg"><label>Empresa</label><input id="cf_emp" value="${c.empresa||''}"></div></div>
-    <div class="row r3"><div class="fg"><label>NIT/CC</label><input id="cf_nit" value="${c.nit_cc||''}"></div>
-    <div class="fg"><label>Teléfono</label><input id="cf_tel" value="${c.telefono||''}"></div>
-    <div class="fg"><label>Email</label><input id="cf_email" value="${c.email_cliente||''}"></div></div>
-    <div class="row r3"><div class="fg"><label>Dirección</label><input id="cf_dir" value="${c.direccion||''}"></div>
-    <div class="fg"><label>Ciudad</label><input id="cf_ciu" value="${c.ciudad||''}"></div>
-    <div class="fg"><label>Proyecto</label><input id="cf_proy" value="${c.proyecto||''}" oninput="updatePreview()"></div></div>
-    <div class="row r4"><div class="fg"><label>Tipo</label><select id="cf_tipo">${['MIXTA','PRODUCTOS','SERVICIOS'].map(t=>`<option ${c.tipo_cotizacion===t?'selected':''}>${t}</option>`).join('')}</select></div>
-    <div class="fg"><label>Forma pago</label><input id="cf_pago" value="${c.forma_pago||'70% - 30%'}"></div>
-    <div class="fg"><label>Anticipo %</label><input type="number" id="cf_ant" value="${c.anticipo_pct!=null?Math.round(c.anticipo_pct*100):70}" min="0" max="100" oninput="updatePreview()"></div>
-    <div class="fg"><label>Anticipo valor (manual)</label><input type="number" id="cf_antv" value="${c.anticipo_val_manual||0}" min="0" step="1000" oninput="updatePreview()" placeholder="0 = automático"></div>
-    <div class="fg"><label>Abonado (pagado)</label><input type="number" id="cf_abonado" value="${c.abonado_val||0}" min="0" step="1000" oninput="updatePreview()" placeholder="0 si no ha pagado"></div>
-    <div class="fg"><label>Descuento %</label><input type="number" id="cf_desc" value="${c.descuento_pct!=null?Math.round(c.descuento_pct*100):0}" min="0" max="100" step="0.1" oninput="updatePreview()"></div></div>
-    <div class="row r2" style="margin-top:6px"><div class="fg"><label>Lista de precios</label><select id="cf_plist" onchange="updatePreview()">${plOpts}</select></div>
-    <div class="fg"><label>Notas internas (solo equipo)</label><textarea id="cf_inotas" rows="2">${(c.notas_internas||'').replaceAll('<','&lt;')}</textarea></div></div>
-    <div class="card" style="margin-top:8px;padding:10px"><div style="font-size:12px;font-weight:900;opacity:.85">Checklist interno</div>
-      <div id="cf_chk" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px">${chkHtml}</div>
+    <div class="cot-section">
+      <div class="cot-section-hdr">👤 Datos del cliente</div>
+      <div class="cot-section-body">
+        <div class="row r2"><div class="fg"><label>Cliente *</label><input id="cf_cli" value="${c.cliente||''}" oninput="updatePreview()" placeholder="Nombre completo"></div>
+        <div class="fg"><label>Empresa</label><input id="cf_emp" value="${c.empresa||''}" placeholder="Nombre de la empresa"></div></div>
+        <div class="row r3"><div class="fg"><label>NIT / CC</label><input id="cf_nit" value="${c.nit_cc||''}" placeholder="NIT o cédula"></div>
+        <div class="fg"><label>Teléfono</label><input id="cf_tel" value="${c.telefono||''}" placeholder="3XX XXX XXXX"></div>
+        <div class="fg"><label>Email</label><input id="cf_email" value="${c.email_cliente||''}" placeholder="correo@empresa.com"></div></div>
+        <div class="row r3"><div class="fg"><label>Dirección</label><input id="cf_dir" value="${c.direccion||''}" placeholder="Calle / Carrera"></div>
+        <div class="fg"><label>Ciudad</label><input id="cf_ciu" value="${c.ciudad||''}" placeholder="Sincelejo, Bogotá…"></div>
+        <div class="fg"><label>Proyecto</label><input id="cf_proy" value="${c.proyecto||''}" oninput="updatePreview()" placeholder="Nombre del proyecto"></div></div>
+      </div>
     </div>
-    <div class="fg"><label>Notas</label><textarea id="cf_notas" oninput="updatePreview()">${c.notas||''}</textarea></div>
-    <h4 style="margin:8px 0 4px;font-size:12px">Agregar Productos</h4>
-    <div style="display:grid;grid-template-columns:140px 1fr 70px;gap:4px;margin-bottom:6px">
-      <select id="cf_catSel" onchange="filterProdSel()" style="padding:5px;border:1.5px solid var(--brd);border-radius:var(--R);font-size:11px">
-        <option value="">Categoría</option>${catOpts}</select>
-      <select id="cf_prodSel" style="padding:5px;border:1.5px solid var(--brd);border-radius:var(--R);font-size:11px"><option value="">— Producto —</option></select>
-      <button class="btn btn-p" onclick="addCotItem()">＋</button>
+
+    <div class="cot-section">
+      <div class="cot-section-hdr">💰 Condiciones financieras</div>
+      <div class="cot-section-body">
+        <div class="row r3">
+          <div class="fg"><label>Tipo</label><select id="cf_tipo">${['MIXTA','PRODUCTOS','SERVICIOS'].map(t=>`<option ${c.tipo_cotizacion===t?'selected':''}>${t}</option>`).join('')}</select></div>
+          <div class="fg"><label>Forma de pago</label><input id="cf_pago" value="${c.forma_pago||'70% - 30%'}"></div>
+          <div class="fg"><label>Lista de precios</label><select id="cf_plist" onchange="updatePreview()">${plOpts}</select></div>
+        </div>
+        <div class="row r4">
+          <div class="fg"><label>Anticipo %</label><input type="number" id="cf_ant" value="${c.anticipo_pct!=null?Math.round(c.anticipo_pct*100):70}" min="0" max="100" oninput="updatePreview()"></div>
+          <div class="fg"><label>Anticipo valor manual</label><input type="number" id="cf_antv" value="${c.anticipo_val_manual||0}" min="0" step="1000" oninput="updatePreview()" placeholder="0 = automático"></div>
+          <div class="fg"><label>Abonado</label><input type="number" id="cf_abonado" value="${c.abonado_val||0}" min="0" step="1000" oninput="updatePreview()" placeholder="0 si no ha pagado"></div>
+          <div class="fg"><label>Descuento %</label><input type="number" id="cf_desc" value="${c.descuento_pct!=null?Math.round(c.descuento_pct*100):0}" min="0" max="100" step="0.1" oninput="updatePreview()"></div>
+        </div>
+        <div class="row r2">
+          <div class="fg"><label>Notas del cliente (aparece en PDF)</label><textarea id="cf_notas" oninput="updatePreview()" rows="2" placeholder="Condiciones especiales, observaciones…">${c.notas||''}</textarea></div>
+          <div class="fg"><label>Notas internas (solo equipo)</label><textarea id="cf_inotas" rows="2" placeholder="Notas internas que NO aparecen en PDF">${(c.notas_internas||'').replaceAll('<','&lt;')}</textarea></div>
+        </div>
+      </div>
     </div>
-    <div class="tbl-wrap" style="max-height:260px;overflow-y:auto"><table class="dt"><thead>
-    <tr><th>Img</th><th>Producto</th><th>Cant</th><th>P.Manual</th><th>Inst.</th><th>Cfg.</th><th></th></tr>
-    </thead><tbody id="cotItemsBody"></tbody></table></div>
-    <div style="margin-top:10px;display:flex;gap:6px">
-      <button class="btn btn-p" onclick="saveCot()">💾 ${COT_EDIT_ID?'Guardar':'Crear'}</button>
-      <button class="btn btn-o" onclick="closeModal('ovCot')">Cancelar</button>
+
+    <div class="cot-section">
+      <div class="cot-section-hdr">✅ Checklist de seguimiento</div>
+      <div class="cot-section-body">
+        <div id="cf_chk" style="display:grid;grid-template-columns:1fr 1fr;gap:6px">${chkHtml}</div>
+      </div>
+    </div>
+
+    <div class="cot-section">
+      <div class="cot-section-hdr" style="justify-content:space-between">
+        <span>📦 Productos / Servicios</span>
+        <span id="cotItemsCount" style="background:var(--acc-soft);color:#15803d;font-size:10px;font-weight:800;padding:2px 10px;border-radius:99px">0 ítems</span>
+      </div>
+      <div class="cot-section-body">
+        <div style="display:grid;grid-template-columns:1fr 1.5fr auto;gap:8px;margin-bottom:10px;align-items:end">
+          <div class="fg" style="margin:0"><label>Categoría</label>
+            <select id="cf_catSel" onchange="filterProdSel()">
+              <option value="">Todas las categorías</option>${catOpts}
+            </select>
+          </div>
+          <div class="fg" style="margin:0"><label>Producto</label>
+            <select id="cf_prodSel"><option value="">— Seleccionar producto —</option></select>
+          </div>
+          <button class="btn btn-p" onclick="addCotItem()" style="height:40px;font-size:15px;font-weight:900;min-width:44px">＋</button>
+        </div>
+        <div class="tbl-wrap" style="max-height:320px;overflow-y:auto">
+          <table class="dt"><thead>
+            <tr><th>Img</th><th>Producto</th><th>Cant</th><th>P.Manual</th><th>Inst.</th><th>Cfg.</th><th></th></tr>
+          </thead><tbody id="cotItemsBody"></tbody></table>
+        </div>
+        <div id="cotItemsEmpty" style="display:none;text-align:center;padding:24px;color:var(--txtL);font-size:13px">
+          <div style="font-size:28px;margin-bottom:8px">📦</div>
+          <div>Aún no has agregado productos.</div>
+          <div style="font-size:11px;margin-top:4px">Selecciona una categoría y un producto arriba.</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px;padding:4px 0 16px">
+      <button class="btn btn-p" onclick="saveCot()" style="flex:1;justify-content:center;padding:12px;font-size:14px">💾 ${COT_EDIT_ID?'Guardar cambios':'Crear cotización'}</button>
+      <button class="btn btn-o" onclick="closeCotEditor()" style="padding:12px 20px">← Volver</button>
     </div>`;
   filterProdSel();renderCotItems();
-  if(window.innerWidth<=900)$('#btnTogglePreview').style.display='inline-flex';else $('#btnTogglePreview').style.display='none';
 }
 
 function filterProdSel(){
@@ -1827,15 +1981,19 @@ function addCotItem(){
 
 function renderCotItems(){
   const tb=$('#cotItemsBody');if(!tb)return;
+  const empty=$('#cotItemsEmpty');
+  const counter=$('#cotItemsCount');
+  if(counter) counter.textContent=`${COT_ITEMS.length} ítem${COT_ITEMS.length===1?'':'s'}`;
+  if(empty){empty.style.display=COT_ITEMS.length?'none':'block';}
   tb.innerHTML=COT_ITEMS.map((it,i)=>{
     const img=it.imagen_url?`<img class="img-th" src="${it.imagen_url}" loading="lazy" onerror="this.outerHTML='<div class=no-img>—</div>'">`:'<div class="no-img">—</div>';
     return`<tr><td>${img}</td>
-    <td><strong style="font-size:10px">${it.nombre}</strong><br><small style="color:#999">${it.id_producto}</small></td>
-    <td><input type="number" value="${it.cantidad}" min="1" style="width:45px;padding:3px" onchange="updCI(${i},'cantidad',this.value)"></td>
-    <td><input type="number" value="${it.precio_manual}" min="0" style="width:75px;padding:3px" onchange="updCI(${i},'precio_manual',this.value)" placeholder="${it.precio}"></td>
-    <td><input type="number" value="${it.inst_manual}" min="0" style="width:65px;padding:3px" onchange="updCI(${i},'inst_manual',this.value)" placeholder="${it.inst_default}"></td>
-    <td><input type="number" value="${it.cfg_manual}" min="0" style="width:65px;padding:3px" onchange="updCI(${i},'cfg_manual',this.value)" placeholder="${it.config_default}"></td>
-    <td><button class="btn btn-d btn-sm" onclick="rmCI(${i})">✕</button></td></tr>`}).join('');
+    <td><strong style="font-size:11px">${escapeHtml(it.nombre)}</strong><br><small style="color:#999;font-size:10px">${it.id_producto}</small></td>
+    <td><input type="number" value="${it.cantidad}" min="1" style="width:50px;padding:4px 6px;border:1.5px solid var(--brd);border-radius:6px;text-align:center" onchange="updCI(${i},'cantidad',this.value)"></td>
+    <td><input type="number" value="${it.precio_manual||''}" min="0" style="width:80px;padding:4px 6px;border:1.5px solid var(--brd);border-radius:6px" onchange="updCI(${i},'precio_manual',this.value)" placeholder="${it.precio}"></td>
+    <td><input type="number" value="${it.inst_manual||''}" min="0" style="width:70px;padding:4px 6px;border:1.5px solid var(--brd);border-radius:6px" onchange="updCI(${i},'inst_manual',this.value)" placeholder="${it.inst_default||'0'}"></td>
+    <td><input type="number" value="${it.cfg_manual||''}" min="0" style="width:70px;padding:4px 6px;border:1.5px solid var(--brd);border-radius:6px" onchange="updCI(${i},'cfg_manual',this.value)" placeholder="${it.config_default||'0'}"></td>
+    <td><button class="btn btn-d btn-sm" onclick="rmCI(${i})" title="Quitar">✕</button></td></tr>`}).join('');
 }
 function updCI(i,f,v){COT_ITEMS[i][f]=parseFloat(v)||0;updatePreview()}
 function rmCI(i){COT_ITEMS.splice(i,1);renderCotItems();updatePreview()}
@@ -1894,11 +2052,11 @@ async function saveCot(){
     anticipo_val_manual:(parseFloat($('#cf_antv').value)||0),
     abonado_val:(parseFloat($('#cf_abonado').value)||0),
     descuento_pct:(parseFloat($('#cf_desc').value)||0)/100,
-    descuento_val:0,notas:$('#cf_notas').value,estado:COT_EDIT_ID?undefined:'BORRADOR',
+    descuento_val:0,notas:$('#cf_notas').value,notas_internas:($('#cf_inotas')||{value:''}).value||'',estado:COT_EDIT_ID?undefined:'BORRADOR',
     items:COT_ITEMS.map(it=>({id_producto:it.id_producto,cantidad:it.cantidad,precio_manual:it.precio_manual,inst_manual:it.inst_manual,cfg_manual:it.cfg_manual,notas_item:it.notas_item||''}))};
-  if(COT_EDIT_ID){await api(`/api/cotizaciones/${COT_EDIT_ID}`,{method:'PUT',body:data});toast('✅ Actualizada')}
-  else{const r=await api('/api/cotizaciones',{method:'POST',body:data});toast(`✅ ${r.no_cotizacion} creada`)}
-  closeModal('ovCot');loadCots();
+  if(COT_EDIT_ID){const r=await api(`/api/cotizaciones/${COT_EDIT_ID}`,{method:'PUT',body:data});if(r&&r.ok===false){toast('❌ '+(r.error||'Error al guardar'));return;}toast('✅ Cotización actualizada')}
+  else{const r=await api('/api/cotizaciones',{method:'POST',body:data});if(r&&r.ok===false){toast('❌ '+(r.error||'Error al crear'));return;}toast(`✅ ${r.no_cotizacion} creada`)}
+  goPage('cots');loadCots();
 }
 
 /* ═══════════ CATÁLOGO ═══════════ */

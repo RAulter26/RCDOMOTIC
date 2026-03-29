@@ -1486,11 +1486,15 @@ def update_cotizacion(cot_id):
                 (d.get("estado", curr.get("estado", "BORRADOR")), cot_id))
         return jsonify({"ok": True})
 
+    # Campos obligatorios que nunca pueden quedar vacíos
+    REQUIRED_FIELDS = {"cliente", "tipo_cotizacion", "forma_pago"}
+
     def keep(key, default=""):
         v = d.get(key, None)
         if v is None:
             return curr.get(key, default)
-        if isinstance(v, str) and v.strip() == "":
+        # Solo bloquear vaciado en campos requeridos
+        if key in REQUIRED_FIELDS and isinstance(v, str) and v.strip() == "":
             return curr.get(key, default)
         return v
 
@@ -1594,6 +1598,15 @@ def update_cotizacion(cot_id):
                      it.get("cfg_manual", 0), it.get("notas_item", "")))
 
     return jsonify({"ok": True})
+
+
+@app.delete('/api/cotizaciones/<int:cot_id>')
+@role_required('admin','vendedor')
+def delete_cotizacion(cot_id):
+    if not query("SELECT id FROM cotizaciones WHERE id=?", (cot_id,), one=True):
+        return jsonify({'ok': False, 'error': 'No encontrada'}), 404
+    execute("DELETE FROM cotizaciones WHERE id=?", (cot_id,))
+    return jsonify({'ok': True})
 
 
 @app.post('/api/cotizaciones/<int:cot_id>/clone')
