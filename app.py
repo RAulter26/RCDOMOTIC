@@ -2099,6 +2099,83 @@ def get_stats_bi():
         'dept': dept_rows
     })
 
+@app.get('/api/stats/ops')
+def get_stats_ops():
+    """Dashboard operacional: pipeline, alertas, meta, actividad reciente."""
+    try:
+        import datetime as dt_mod
+        today = dt_mod.date.today()
+        mes_ini = today.replace(day=1).strftime('%Y-%m-%d')
+
+        # Pipeline por estado
+        pipeline_rows = query(
+            "SELECT estado, COUNT(*) as cnt, COALESCE(SUM(total_final),0) as total "
+            "FROM cotizaciones GROUP BY estado ORDER BY estado"
+        )
+
+        # Por cobrar: aprobadas con saldo pendiente
+        por_cobrar_row = query(
+            "SELECT COALESCE(SUM(total_final - COALESCE(abonado_val,0)),0) as v "
+            "FROM cotizaciones WHERE estado='APROBADA'", one=True)
+        por_cobrar = float((por_cobrar_row or {}).get('v') or 0)
+
+        # Vendido este mes (aprobadas)
+        venta_mes_row = query(
+            "SELECT COALESCE(SUM(total_final),0) as v FROM cotizaciones "
+            "WHERE estado='APROBADA' AND fecha >= ?", (mes_ini,), one=True)
+        venta_mes = float((venta_mes_row or {}).get('v') or 0)
+
+        # Vigencia configurada
+        vig_row = query("SELECT valor FROM parametros WHERE clave='vigencia_dias'", one=True)
+        vigencia = int(vig_row['valor']) if vig_row and vig_row.get('valor') else 8
+
+        # Meta mensual
+        meta_row = query("SELECT valor FROM parametros WHERE clave='meta_ventas_mes'", one=True)
+        meta_mes = float(meta_row['valor']) if meta_row and meta_row.get('valor') else 0
+
+        # Alertas: enviadas sin respuesta hace >3 días
+        sin_resp = query(
+            "SELECT id, no_cotizacion, cliente, fecha, total_final FROM cotizaciones "
+            "WHERE estado='ENVIADA' AND date(fecha) <= date('now','-3 days') "
+            "ORDER BY fecha ASC LIMIT 10")
+
+        # Alertas: por vencer (borrador/enviada, creadas hace > vigencia-2 días)
+        umbral = max(vigencia - 2, 1)
+        por_vencer = query(
+            f"SELECT id, no_cotizacion, cliente, fecha, total_final FROM cotizaciones "
+            f"WHERE estado IN ('BORRADOR','ENVIADA') "
+            f"AND date(fecha) <= date('now','-{umbral} days') "
+            f"ORDER BY fecha ASC LIMIT 10")
+
+        # Recientemente aprobadas (últimas 5, este mes)
+        recien_aprobadas = query(
+            "SELECT id, no_cotizacion, cliente, fecha, total_final FROM cotizaciones "
+            "WHERE estado='APROBADA' ORDER BY id DESC LIMIT 5")
+
+        # Actividad reciente (últimas 8 cotizaciones por id)
+        actividad = query(
+            "SELECT id, no_cotizacion, cliente, fecha, total_final, estado "
+            "FROM cotizaciones ORDER BY id DESC LIMIT 8")
+
+        total_alertas = len(sin_resp) + len(por_vencer)
+
+        return jsonify({
+            'ok': True,
+            'pipeline': pipeline_rows,
+            'por_cobrar': por_cobrar,
+            'venta_mes': venta_mes,
+            'meta_mes': meta_mes,
+            'vigencia_dias': vigencia,
+            'alertas_sin_respuesta': sin_resp,
+            'alertas_por_vencer': por_vencer,
+            'recien_aprobadas': recien_aprobadas,
+            'actividad': actividad,
+            'total_alertas': total_alertas,
+        })
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)})
+
+
 # ─── COMANDOS (SEGURO — no SQL libre) ───────────────────────────────────────
 @app.post('/api/commands/create_quote')
 def cmd_create_quote():

@@ -888,70 +888,100 @@ table.tbl tbody tr:hover { background: var(--acc-soft) }
 <div class="wrap">
 
 <!-- ═══ DASHBOARD ═══ -->
-<div class="page act" id="pg-dash">
-  <div class="card">
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
-      <div>
-        <div style="font-size:24px;font-weight:900;letter-spacing:-.5px;color:var(--txt)">Resumen General</div>
-        <div style="font-size:13px;color:var(--txtL);margin-top:2px">BI — análisis integral (ventas, margen, inventario)</div>
+<div class=”page act” id=”pg-dash”>
+
+  <!-- ── HERO ── -->
+  <div style=”background:linear-gradient(135deg,#0a0a0a 0%,#1a1a2e 60%,#0d2818 100%);border-radius:18px;padding:22px 24px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;box-shadow:0 4px 24px rgba(0,0,0,.25)”>
+    <div>
+      <div style=”font-size:22px;font-weight:900;color:#fff;letter-spacing:-.4px”>Buenos días, <span style=”color:var(--acc)”>Raúl</span> 👋</div>
+      <div id=”dashHeroSub” style=”font-size:13px;color:rgba(255,255,255,.5);margin-top:4px”>Cargando resumen…</div>
+    </div>
+    <button class=”btn btn-p” onclick=”openNewCot()” style=”font-size:14px;padding:11px 24px;font-weight:800”>＋ Nueva cotización</button>
+  </div>
+
+  <!-- ── KPIs OPERACIONALES ── -->
+  <div style=”display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px” id=”opsCards”>
+    <div class=”stat” style=”border-top-color:var(--success)”><div class=”n” style=”color:#15803d” id=”ok_venta_mes”>—</div><div class=”l”>💰 Vendido este mes</div></div>
+    <div class=”stat” style=”border-top-color:var(--info)”><div class=”n” style=”color:var(--info)” id=”ok_por_cobrar”>—</div><div class=”l”>🏦 Por cobrar</div></div>
+    <div class=”stat” style=”border-top-color:#f59e0b”><div class=”n” style=”color:#d97706” id=”ok_enviadas”>—</div><div class=”l”>📤 Enviadas</div></div>
+    <div class=”stat” style=”border-top-color:#a78bfa”><div class=”n” style=”color:#7c3aed” id=”ok_borradores”>—</div><div class=”l”>📝 Borradores</div></div>
+    <div class=”stat” style=”border-top-color:var(--danger)” id=”ok_alertas_card”><div class=”n” style=”color:var(--danger)” id=”ok_alertas”>—</div><div class=”l”>⚠ Alertas</div></div>
+  </div>
+
+  <!-- ── META MENSUAL ── -->
+  <div class=”card” id=”dashMetaBox” style=”margin-bottom:14px;display:none”>
+    <div style=”display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:8px;flex-wrap:wrap”>
+      <h2 style=”margin:0”>🎯 Meta mensual</h2>
+      <div id=”dashMetaLabel” style=”font-size:13px;font-weight:700;color:var(--txtL)”></div>
+    </div>
+    <div style=”background:var(--brd-light);border-radius:99px;height:12px;overflow:hidden”>
+      <div id=”dashMetaBar” style=”height:100%;border-radius:99px;background:linear-gradient(90deg,var(--acc),var(--acc2));transition:width .6s cubic-bezier(.4,0,.2,1);width:0%”></div>
+    </div>
+    <div id=”dashMetaSub” style=”font-size:11px;color:var(--txtL);margin-top:6px”></div>
+  </div>
+
+  <!-- ── EMBUDO + ALERTAS ── -->
+  <div class=”grid-2c” id=”dashExtras” style=”margin-bottom:14px”>
+    <div class=”card”>
+      <h2 style=”margin-bottom:12px”>📊 Pipeline de ventas</h2>
+      <div id=”dashPipeline”><div style=”color:var(--txtL);font-size:12px”>Cargando…</div></div>
+    </div>
+    <div class=”card”>
+      <h2 style=”margin-bottom:12px”>🔔 Alertas del día</h2>
+      <div id=”dashAlertas”><div style=”color:var(--txtL);font-size:12px”>Cargando…</div></div>
+    </div>
+  </div>
+
+  <!-- ── ACTIVIDAD + TOP ── -->
+  <div class=”grid-2c” style=”margin-bottom:14px”>
+    <div class=”card”>
+      <h2 style=”margin-bottom:12px”>🕐 Actividad reciente</h2>
+      <div id=”dashActividad”><div style=”color:var(--txtL);font-size:12px”>Cargando…</div></div>
+    </div>
+    <div class=”card”>
+      <h2 style=”margin-bottom:8px”>🏆 Top del mes (Aprobadas)</h2>
+      <div id=”dashTopBox” style=”font-size:12px;color:var(--txtL)”>Cargando…</div>
+    </div>
+  </div>
+
+  <!-- ── BI FINANCIERO ── -->
+  <div class=”card” style=”margin-bottom:14px”>
+    <div style=”display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:12px”>
+      <h2 style=”margin:0”>📈 Análisis financiero (BI)</h2>
+      <div style=”display:flex;gap:6px;flex-wrap:wrap”>
+        <button class=”btn btn-o btn-sm” onclick=”setDashScope('ALL')” id=”scopeAll”>Todas</button>
+        <button class=”btn btn-o btn-sm” onclick=”setDashScope('APROBADA')” id=”scopeAprobada”>Solo aprobadas</button>
+        <span style=”width:1px;height:20px;background:var(--brd);align-self:center”></span>
+        <button class=”btn btn-o btn-sm” onclick=”setDashPeriod('week')”>Semana</button>
+        <button class=”btn btn-o btn-sm” onclick=”setDashPeriod('month')”>Mes</button>
+        <button class=”btn btn-o btn-sm” onclick=”setDashPeriod('quarter')”>Trimestre</button>
+        <button class=”btn btn-o btn-sm” onclick=”setDashPeriod('year')”>Año</button>
       </div>
-      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
-        <button class="btn btn-o btn-sm" onclick="setDashScope('ALL')">Anual</button>
-        <button class="btn btn-o btn-sm" onclick="setDashScope('APROBADA')">Aprobadas</button>
-        <span style="width:1px;height:20px;background:var(--brd);margin:0 4px"></span>
-        <span style="font-size:11px;color:var(--txtXL);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Rango:</span>
-        <button class="btn btn-o btn-sm" onclick="setDashPeriod('week')">Semana</button>
-        <button class="btn btn-o btn-sm" onclick="setDashPeriod('month')">Mes</button>
-        <button class="btn btn-o btn-sm" onclick="setDashPeriod('quarter')">Trimestre</button>
-        <button class="btn btn-o btn-sm" onclick="setDashPeriod('year')">Año</button>
-      </div>
+    </div>
+    <div class=”stats” id=”biCards” style=”margin-bottom:14px”></div>
+    <h2 id=”salesTitle” style=”margin-bottom:8px;font-size:14px”>📈 Ventas</h2>
+    <canvas id=”salesChart” height=”110” style=”width:100%”></canvas>
+  </div>
+
+  <div class=”grid-2c” id=”biCharts”>
+    <div class=”card”>
+      <h2 style=”margin-bottom:8px”>Ventas por Categoría</h2>
+      <canvas id=”deptBar” height=”180” style=”width:100%”></canvas>
+    </div>
+    <div class=”card”>
+      <h2 style=”margin-bottom:8px”>Participación en Ventas</h2>
+      <canvas id=”deptDonut” height=”180” style=”width:100%”></canvas>
     </div>
   </div>
 
-  <div class="stats" id="biCards"></div>
-
-  <div class="grid-2c" id="dashExtras">
-    <div class="card">
-      <h2 style="margin-bottom:8px">⚡ Atajos</h2>
-      <div style="display:flex;flex-wrap:wrap;gap:8px">
-        <button class="btn btn-p btn-sm" onclick="openNewCot()">＋ Nueva cotización</button>
-        <button class="btn btn-o btn-sm" onclick="goPage('cots')">📂 Cotizaciones</button>
-        <button class="btn btn-o btn-sm" onclick="goPage('cat')">📦 Catálogo</button>
-        <button class="btn btn-o btn-sm" onclick="goPage('buy')">🧾 Compras</button>
-        <button class="btn btn-o btn-sm" onclick="goPage('inv')">📋 Inventario</button>
-      </div>
-      <div style="margin-top:10px;font-size:11px;color:var(--txtL)">Tip: usa “🔄 Actualizar” para recargar datos sin salir del módulo.</div>
-    </div>
-    <div class="card">
-      <h2 style="margin-bottom:8px">🏆 Top del mes (Aprobadas)</h2>
-      <div id="dashTopBox" style="font-size:12px;color:var(--txtL)">Cargando…</div>
-    </div>
+  <div class=”card” style=”margin-top:14px”>
+    <h2 style=”margin-bottom:8px”>Margen Bruto (%) por Categoría</h2>
+    <canvas id=”marginBar” height=”170” style=”width:100%”></canvas>
   </div>
 
-  <div class="card">
-    <h2 id="salesTitle" style="margin-bottom:8px">📈 Ventas</h2>
-    <canvas id="salesChart" height="120" style="width:100%"></canvas>
-  </div>
-
-  <div class="grid-2c" id="biCharts">
-    <div class="card">
-      <h2 style="margin-bottom:8px">Ventas Netas por Departamento</h2>
-      <canvas id="deptBar" height="180" style="width:100%"></canvas>
-    </div>
-    <div class="card">
-      <h2 style="margin-bottom:8px">Participación en Ventas</h2>
-      <canvas id="deptDonut" height="180" style="width:100%"></canvas>
-    </div>
-  </div>
-
-  <div class="card">
-    <h2 style="margin-bottom:8px">Margen Bruto (%) por Departamento</h2>
-    <canvas id="marginBar" height="170" style="width:100%"></canvas>
-  </div>
-
-  <div class="card">
-    <h2 style="margin-bottom:8px">Detalle por Departamento</h2>
-    <div class="tbl-wrap"><table class="dt" id="deptTable"><thead></thead><tbody></tbody></table></div>
+  <div class=”card” style=”margin-top:14px”>
+    <h2 style=”margin-bottom:8px”>Detalle por Categoría</h2>
+    <div class=”tbl-wrap”><table class=”dt” id=”deptTable”><thead></thead><tbody></tbody></table></div>
   </div>
 </div>
 
@@ -1358,7 +1388,94 @@ let DASH_SCOPE='APROBADA';
 let DASH_PERIOD='month';
 function setDashScope(s){DASH_SCOPE=s;loadDash();}
 function setDashPeriod(p){DASH_PERIOD=p;loadDash();}
+async function loadDashOps(){
+  const d=await api('/api/stats/ops');
+  if(!d||d.ok===false) return;
+
+  // KPI cards
+  const fmt2=v=>Number(v||0).toLocaleString('es-CO',{style:'currency',currency:'COP',maximumFractionDigits:0});
+  $('#ok_venta_mes').textContent=fmt2(d.venta_mes);
+  $('#ok_por_cobrar').textContent=fmt2(d.por_cobrar);
+  $('#ok_enviadas').textContent=(d.pipeline?.ENVIADA||0);
+  $('#ok_borradores').textContent=(d.pipeline?.BORRADOR||0);
+  const nAlertas=Number(d.total_alertas||0);
+  $('#ok_alertas').textContent=nAlertas;
+  const ac=$('#ok_alertas_card');
+  if(ac) ac.style.borderTopColor=nAlertas>0?'var(--danger)':'var(--success)';
+
+  // Hero subtitle
+  const sub=$('#dashHeroSub');
+  if(sub){
+    const pend=(d.pipeline?.ENVIADA||0)+(d.pipeline?.BORRADOR||0);
+    sub.textContent=`${pend} cot. en progreso · ${fmt2(d.por_cobrar)} por cobrar${nAlertas>0?' · ⚠ '+nAlertas+' alerta'+(nAlertas>1?'s':''):''}`;
+  }
+
+  // Meta mensual
+  const meta=Number(d.meta_mes||0);
+  const metaBox=$('#dashMetaBox');
+  if(meta>0&&metaBox){
+    metaBox.style.display='';
+    const pct=Math.min(100,Math.round(Number(d.venta_mes||0)/meta*100));
+    const bar=$('#dashMetaBar');
+    if(bar){bar.style.width=pct+'%';bar.style.background=pct>=100?'linear-gradient(90deg,#22c55e,#16a34a)':pct>=60?'linear-gradient(90deg,var(--acc),var(--acc2))':'linear-gradient(90deg,#f59e0b,#d97706)';}
+    const lbl=$('#dashMetaLabel'); if(lbl) lbl.textContent=pct+'% de '+fmt2(meta);
+    const msub=$('#dashMetaSub'); if(msub) msub.textContent=pct>=100?'🎉 ¡Meta alcanzada este mes!':`Faltan ${fmt2(meta-Number(d.venta_mes||0))} para la meta`;
+  } else if(metaBox) metaBox.style.display='none';
+
+  // Pipeline funnel
+  const pipe=$('#dashPipeline');
+  if(pipe){
+    const estados=[['BORRADOR','📝','#a78bfa'],['ENVIADA','📤','#f59e0b'],['APROBADA','✅','#22c55e'],['RECHAZADA','❌','#ef4444'],['CANCELADA','🚫','#64748b']];
+    const total=estados.reduce((s,[e])=>s+(d.pipeline?.[e]||0),0)||1;
+    pipe.innerHTML=`<div style="display:grid;gap:6px">`+estados.map(([e,ic,col])=>{
+      const n=d.pipeline?.[e]||0;
+      const pct=Math.round(n/total*100);
+      return `<div style="display:grid;grid-template-columns:90px 1fr 36px;align-items:center;gap:8px;font-size:12px">
+        <div style="color:${col};font-weight:700">${ic} ${e}</div>
+        <div style="background:var(--brd-light);border-radius:99px;height:8px;overflow:hidden"><div style="height:100%;border-radius:99px;background:${col};width:${pct}%;transition:width .5s"></div></div>
+        <div style="text-align:right;font-weight:900">${n}</div>
+      </div>`;
+    }).join('')+`<div style="font-size:11px;color:var(--txtL);text-align:right;margin-top:2px">Total: ${total} cotizaciones</div></div>`;
+  }
+
+  // Alertas
+  const alertBox=$('#dashAlertas');
+  if(alertBox){
+    const items=[];
+    (d.alertas_sin_respuesta||[]).forEach(a=>items.push({tipo:'sin_resp',label:`<b>${escapeHtml(a.cliente||'?')}</b> — cot. #${a.numero||a.id} enviada hace ${a.dias||'?'}d sin respuesta`,color:'#ef4444'}));
+    (d.alertas_por_vencer||[]).forEach(a=>items.push({tipo:'vencer',label:`<b>${escapeHtml(a.cliente||'?')}</b> — cot. #${a.numero||a.id} vence en ${a.dias_restantes||'?'}d`,color:'#f59e0b'}));
+    (d.recien_aprobadas||[]).forEach(a=>items.push({tipo:'aprobada',label:`<b>${escapeHtml(a.cliente||'?')}</b> — cot. #${a.numero||a.id} aprobada ✅`,color:'#22c55e'}));
+    if(items.length===0){
+      alertBox.innerHTML=`<div style="text-align:center;padding:20px 0;color:var(--txtL);font-size:12px">✅ Sin alertas pendientes</div>`;
+    } else {
+      alertBox.innerHTML=`<div style="display:grid;gap:6px">`+items.map(it=>`<div style="display:flex;gap:8px;align-items:flex-start;font-size:12px;padding:7px 9px;border-radius:8px;background:var(--bg2);border-left:3px solid ${it.color}">${it.label}</div>`).join('')+`</div>`;
+    }
+  }
+
+  // Actividad reciente
+  const actBox=$('#dashActividad');
+  if(actBox){
+    const acts=d.actividad||[];
+    if(acts.length===0){
+      actBox.innerHTML=`<div style="text-align:center;padding:20px 0;color:var(--txtL);font-size:12px">Sin actividad reciente</div>`;
+    } else {
+      const estadoColor={BORRADOR:'#a78bfa',ENVIADA:'#f59e0b',APROBADA:'#22c55e',RECHAZADA:'#ef4444',CANCELADA:'#64748b'};
+      actBox.innerHTML=`<div style="display:grid;gap:5px">`+acts.map(a=>{
+        const col=estadoColor[a.estado]||'#94a3b8';
+        const fecha=a.updated_at?(new Date(a.updated_at+'Z').toLocaleDateString('es-CO',{day:'2-digit',month:'short'})):'';
+        return `<div style="display:flex;align-items:center;gap:8px;font-size:12px;padding:6px 8px;border-radius:8px;background:var(--bg2)">
+          <div style="width:8px;height:8px;border-radius:50%;background:${col};flex-shrink:0"></div>
+          <div style="flex:1;min-width:0"><span style="font-weight:700">${escapeHtml(a.cliente||'Sin cliente')}</span><span style="opacity:.6;margin-left:6px">#${a.numero||a.id}</span></div>
+          <div style="font-weight:700;color:${col};white-space:nowrap">${a.estado}</div>
+          <div style="opacity:.5;white-space:nowrap">${fecha}</div>
+        </div>`;
+      }).join('')+`</div>`;
+    }
+  }
+}
+
 async function loadDash(){
+  loadDashOps();
   const bi=await api(`/api/stats/bi?scope=${encodeURIComponent(DASH_SCOPE)}&period=${encodeURIComponent(DASH_PERIOD)}`);
   const series=await api(`/api/stats/series?scope=${encodeURIComponent(DASH_SCOPE)}&period=${encodeURIComponent(DASH_PERIOD)}`);
   const pLbl=({week:'Semana',month:'Mes',quarter:'Trimestre',year:'Año',all:'Todo'})[DASH_PERIOD]||'Mes';
@@ -2494,7 +2611,8 @@ async function loadConfig(){
     ['cuenta','Cuenta'],['titular','Titular'],['vigencia_dias','Vigencia (días)'],
     ['plazo_entrega','Plazo'],['garantia','Garantía'],['prefijo_cot','Prefijo cot.'],
     ['consecutivo','Consecutivo'],['forma_pago_default','Forma pago default'],
-    ['anticipo_default','Anticipo default'],['brand_primary','Color primario'],['brand_accent','Color acento']];
+    ['anticipo_default','Anticipo default'],['meta_ventas_mes','Meta ventas mes (COP)'],
+    ['brand_primary','Color primario'],['brand_accent','Color acento']];
   $('#configForm').innerHTML=fs.map(([k,l])=>`<div class="fg"><label>${l}</label><input id="cfg_${k}" value="${PARAMS[k]||''}"></div>`).join('');
 }
 async function saveConfig(){
