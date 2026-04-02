@@ -676,6 +676,39 @@ def calcular_cotizacion(cot_id):
         'saldo_val': round(saldo_val, 0)
     }
 
+CATEGORY_LABELS = {
+    'AUDIOVISUAL': 'SONIDO / AUDIOVISUAL',
+    'CCTV': 'CAMARAS / CCTV',
+    'CERRADURAS': 'CERRADURAS',
+    'DOMOTICA': 'DOMOTICA',
+    'OTROS': 'OTROS',
+    'REDES': 'REDES',
+    'SERVICIOS': 'SERVICIOS',
+}
+
+CATEGORY_ORDER = ['DOMOTICA', 'CCTV', 'AUDIOVISUAL', 'REDES', 'CERRADURAS', 'OTROS', 'SERVICIOS']
+
+def agrupar_items_por_categoria(items):
+    ordered_groups = []
+    groups = {}
+    for it in items:
+        cat = (it.get('categoria') or 'OTROS').upper().strip() or 'OTROS'
+        if cat not in groups:
+            group = {
+                'categoria': cat,
+                'label': CATEGORY_LABELS.get(cat, cat.replace('_', ' ').title()),
+                'items': [],
+                'subtotal': 0.0,
+            }
+            groups[cat] = group
+            ordered_groups.append(group)
+        groups[cat]['items'].append(it)
+        groups[cat]['subtotal'] += float(it.get('total_item') or 0)
+    ordered_groups.sort(key=lambda g: (CATEGORY_ORDER.index(g['categoria']) if g['categoria'] in CATEGORY_ORDER else 999, g['label']))
+    for g in ordered_groups:
+        g['subtotal'] = round(g['subtotal'], 0)
+    return ordered_groups
+
 def next_no_cotizacion():
     p = query("SELECT valor FROM parametros WHERE clave='prefijo_cot'", one=True)
     c = query("SELECT valor FROM parametros WHERE clave='consecutivo'", one=True)
@@ -2432,6 +2465,8 @@ PRINT_TEMPLATE = """<!DOCTYPE html>
   td{padding:4px;border-bottom:1px solid #e0e0e0;vertical-align:middle}
   tr:nth-child(even) td{background:#f5f8ff}
   .right{text-align:right}.center{text-align:center}
+  .cat-band{background:{{ accent }};color:#000;font-weight:800;padding:6px 10px;border-radius:8px 8px 0 0;margin-top:10px;font-size:11px;letter-spacing:.3px}
+  .cat-subtotal td{background:#eef7ff !important;font-weight:800}
   .img-cell{width:50px;text-align:center}
   .img-cell img{width:45px;height:45px;object-fit:contain;border-radius:3px;border:1px solid #e0e0e0}
   .img-cell .no-img{width:45px;height:45px;display:inline-flex;align-items:center;justify-content:center;background:#f0f0f0;border-radius:3px;color:#bbb;font-size:8px;text-align:center}
@@ -2476,10 +2511,12 @@ PRINT_TEMPLATE = """<!DOCTYPE html>
   <div class="info-row"><span class="info-label">Forma pago:</span> {{ cot.forma_pago }}</div>
 </div>
 <div class="section-title">DETALLE DE PRODUCTOS Y SERVICIOS</div>
+{% for grp in grouped_items %}
+<div class="cat-band">{{ grp['label'] }}</div>
 <table><thead>
-<tr><th>#</th><th class="img-cell">Img</th><th>ID</th><th>Producto</th><th>Descripción</th><th class="center">Und</th><th class="center">Cant.</th><th class="right">P.Unit.</th><th class="right">IVA</th><th class="right">Inst.</th><th class="right">TOTAL</th></tr>
+<tr><th>#</th><th class="img-cell">Img</th><th>ID</th><th>Producto</th><th>Descripci??n</th><th class="center">Und</th><th class="center">Cant.</th><th class="right">P.Unit.</th><th class="right">IVA</th><th class="right">Inst.</th><th class="right">TOTAL</th></tr>
 </thead><tbody>
-{% for it in items %}
+{% for it in grp['items'] %}
 <tr><td class="center">{{ loop.index }}</td>
 <td class="img-cell">{% if it.imagen_url %}<img src="{{ it.imagen_url }}" alt="">{% else %}<div class="no-img">Sin<br>img</div>{% endif %}</td>
 <td style="font-weight:700;color:{{ primary }}">{{ it.id_producto }}</td>
@@ -2487,12 +2524,14 @@ PRINT_TEMPLATE = """<!DOCTYPE html>
 <td style="color:#555;font-size:9px">{{ it.descripcion or '' }}</td>
 <td class="center">{{ it.unidad }}</td>
 <td class="center">{{ it.cantidad|int }}</td>
-<td class="right">$ {{ "{:,.0f}".format(it.precio_final).replace(",",".") }}</td>
-<td class="right">{% if it.iva_monto %}$ {{ "{:,.0f}".format(it.iva_monto).replace(",",".") }}{% else %}—{% endif %}</td>
-<td class="right">{% if it.inst_final > 0 %}$ {{ "{:,.0f}".format(it.inst_final * it.cantidad).replace(",",".") }}{% else %}—{% endif %}</td>
-<td class="right"><strong>$ {{ "{:,.0f}".format(it.total_item).replace(",",".") }}</strong></td></tr>
+<td class="right">$ {{ "{:,.0f}".format(it.precio_final).replace(",", ".") }}</td>
+<td class="right">{% if it.iva_monto %}$ {{ "{:,.0f}".format(it.iva_monto).replace(",", ".") }}{% else %}???{% endif %}</td>
+<td class="right">{% if it.inst_final > 0 %}$ {{ "{:,.0f}".format(it.inst_final * it.cantidad).replace(",", ".") }}{% else %}???{% endif %}</td>
+<td class="right"><strong>$ {{ "{:,.0f}".format(it.total_item).replace(",", ".") }}</strong></td></tr>
 {% endfor %}
+<tr class="cat-subtotal"><td colspan="10" class="right">Subtotal {{ grp['label'] }}</td><td class="right">$ {{ "{:,.0f}".format(grp.subtotal).replace(",", ".") }}</td></tr>
 </tbody></table>
+{% endfor %}
 <div class="totals"><table>
 <tr><td>Subtotal:</td><td class="right">$ {{ "{:,.0f}".format(tots.total_bruto).replace(",",".") }}</td></tr>
 {% if tots.descuento > 0 %}<tr><td>(-) Descuento:</td><td class="right" style="color:#C00000">- $ {{ "{:,.0f}".format(tots.descuento).replace(",",".") }}</td></tr>{% endif %}
@@ -2515,12 +2554,13 @@ def print_cotizacion(cot_id):
     if not cot: return "Not found", 404
     pl = float(cot.get('price_list_desc_pct') or 0)
     items_raw = query("""SELECT i.*, c.nombre, c.descripcion, c.unidad, c.precio,
-                         c.aplica_iva, c.pct_iva, c.inst_default, c.config_default, c.imagen_url
+                         c.aplica_iva, c.pct_iva, c.inst_default, c.config_default, c.imagen_url, c.categoria
                          FROM items i JOIN catalogo c ON i.id_producto=c.id_producto
                          WHERE i.cot_id=? ORDER BY i.linea""", (cot_id,))
     items = []
     for it in items_raw:
         items.append({**it, **calcular_item(it, it, pl)})
+    grouped_items = agrupar_items_por_categoria(items)
     tots = calcular_cotizacion(cot_id)
     params = {r['clave']: r['valor'] for r in query("SELECT * FROM parametros")}
     lp = params.get('logo_path','/static/brand_logo.png')
@@ -2531,7 +2571,7 @@ def print_cotizacion(cot_id):
     ts = int(time.time())
     logo_url = f"{lp}?v={ts}" if le else lp
     watermark_url = f"{wp}?v={ts}" if we else wp
-    return render_template_string(PRINT_TEMPLATE, cot=cot, items=items, tots=tots, params=params,
+    return render_template_string(PRINT_TEMPLATE, cot=cot, items=items, grouped_items=grouped_items, tots=tots, params=params,
         primary=params.get('brand_primary','#0F0F0F'), accent=params.get('brand_accent','#25D366'),
         logo_url=logo_url, watermark_url=watermark_url, logo_exists=le, watermark_exists=we)
 
@@ -2564,6 +2604,8 @@ PUBLIC_VIEW_TEMPLATE = """<!doctype html><html lang='es'><head>
   th:first-child{border-radius:10px 0 0 0} th:last-child{border-radius:0 10px 0 0}
   tbody tr:hover{background:rgba(37,211,102,.04)}
   .r{text-align:right}
+  .cat-band{margin-top:16px;padding:10px 14px;background:#25D366;color:#052e16;border-radius:12px 12px 0 0;font-weight:900;font-size:12px;letter-spacing:.3px}
+  .cat-subtotal td{background:#eef7ff;font-weight:800}
   .tot{margin-top:18px; display:flex; justify-content:flex-end}
   .tot table{width:360px}
   .tot td{border-bottom:1px solid #f0f2f5; padding:8px 10px}
@@ -2603,24 +2645,30 @@ PUBLIC_VIEW_TEMPLATE = """<!doctype html><html lang='es'><head>
           <div class='row'><strong>Forma de pago</strong><br>{{ cot.forma_pago }}</div>
         </div>
 
+        {% for grp in grouped_items %}
+        <div class='cat-band'>{{ grp['label'] }}</div>
         <table>
           <thead><tr>
             <th style='width:38px'>#</th><th>Producto</th><th class='r' style='width:70px'>Cant</th><th class='r' style='width:110px'>P.Unit</th><th class='r' style='width:110px'>IVA</th><th class='r' style='width:130px'>Total</th>
           </tr></thead>
           <tbody>
-            {% for it in items %}
+            {% for it in grp['items'] %}
               <tr>
                 <td>{{ loop.index }}</td>
                 <td><strong>{{ it.nombre }}</strong><br><span style='color:#555;font-size:11px'>{{ it.descripcion or '' }}</span></td>
                 <td class='r'>{{ it.cantidad|int }}</td>
-                <td class='r'>$ {{ "{:,.0f}".format(it.precio_final).replace(",",".") }}</td>
-                <td class='r'>{% if it.iva_monto %}$ {{ "{:,.0f}".format(it.iva_monto).replace(",",".") }}{% else %}—{% endif %}</td>
-                <td class='r'><strong>$ {{ "{:,.0f}".format(it.total_item).replace(",",".") }}</strong></td>
+                <td class='r'>$ {{ "{:,.0f}".format(it.precio_final).replace(",", ".") }}</td>
+                <td class='r'>{% if it.iva_monto %}$ {{ "{:,.0f}".format(it.iva_monto).replace(",", ".") }}{% else %}???{% endif %}</td>
+                <td class='r'><strong>$ {{ "{:,.0f}".format(it.total_item).replace(",", ".") }}</strong></td>
               </tr>
             {% endfor %}
+            <tr class='cat-subtotal'>
+              <td colspan='5' class='r'>Subtotal {{ grp['label'] }}</td>
+              <td class='r'>$ {{ "{:,.0f}".format(grp.subtotal).replace(",", ".") }}</td>
+            </tr>
           </tbody>
         </table>
-
+        {% endfor %}
         <div class='tot'>
           <table>
             <tr><td>Subtotal</td><td class='r'>$ {{ "{:,.0f}".format(tots.total_bruto).replace(",",".") }}</td></tr>
@@ -2685,14 +2733,15 @@ def public_view(token):
     if not cot: return "Not found", 404
     pl = float(cot.get('price_list_desc_pct') or 0)
     items_raw = query("""SELECT i.*, c.nombre, c.descripcion, c.unidad, c.precio,
-                         c.aplica_iva, c.pct_iva, c.inst_default, c.config_default
+                         c.aplica_iva, c.pct_iva, c.inst_default, c.config_default, c.categoria
                          FROM items i JOIN catalogo c ON i.id_producto=c.id_producto
                          WHERE i.cot_id=? ORDER BY i.linea""", (cot['id'],))
     items = [{**it, **calcular_item(it, it, pl)} for it in items_raw]
+    grouped_items = agrupar_items_por_categoria(items)
     tots = calcular_cotizacion(cot['id'])
     params = {r['clave']: r['valor'] for r in query("SELECT * FROM parametros")}
     base = request.host_url.rstrip('/')
-    return render_template_string(PUBLIC_VIEW_TEMPLATE, cot=cot, items=items, tots=tots, params=params,
+    return render_template_string(PUBLIC_VIEW_TEMPLATE, cot=cot, items=items, grouped_items=grouped_items, tots=tots, params=params,
         pdf_url=f"{base}/q/{token}/pdf", accept_url=f"{base}/q/{token}/accept")
 
 @app.post('/q/<token>/accept')
@@ -2718,10 +2767,11 @@ def public_pdf(token):
     if not cot: return "Not found", 404
     pl = float(cot.get('price_list_desc_pct') or 0)
     items_raw = query("""SELECT i.*, c.nombre, c.descripcion, c.unidad, c.precio,
-                         c.aplica_iva, c.pct_iva, c.inst_default, c.config_default
+                         c.aplica_iva, c.pct_iva, c.inst_default, c.config_default, c.categoria
                          FROM items i JOIN catalogo c ON i.id_producto=c.id_producto
                          WHERE i.cot_id=? ORDER BY i.linea""", (cot['id'],))
     items = [{**it, **calcular_item(it, it, pl)} for it in items_raw]
+    grouped_items = agrupar_items_por_categoria(items)
     tots = calcular_cotizacion(cot['id'])
     params = {r['clave']: r['valor'] for r in query("SELECT * FROM parametros")}
     from io import BytesIO
@@ -2740,25 +2790,41 @@ def public_pdf(token):
     c.drawString(40, y, f"Fecha: {cot.get('fecha','')}  |  Contacto: {params.get('contacto','')}")
     y -= 22
     c.setFont("Helvetica-Bold", 9)
-    c.drawString(40, y, "#")
-    c.drawString(55, y, "Producto")
-    c.drawRightString(400, y, "Cant")
-    c.drawRightString(470, y, "P.Unit")
-    c.drawRightString(545, y, "Total")
-    y -= 8
-    c.line(40, y, 555, y)
-    y -= 14
-    c.setFont("Helvetica", 9)
-    for idx, it in enumerate(items, 1):
-        if y < 80:
+    row_no = 1
+    for grp in grouped_items:
+        if y < 120:
             c.showPage(); y = h - 40
-        c.drawString(40, y, str(idx))
-        nombre = (it.get('nombre') or '')[:55]
-        c.drawString(55, y, nombre)
-        c.drawRightString(400, y, str(int(it.get('cantidad') or 0)))
-        c.drawRightString(470, y, f"{int(it.get('precio_final') or 0):,}".replace(',', '.'))
-        c.drawRightString(545, y, f"{int(it.get('total_item') or 0):,}".replace(',', '.'))
-        y -= 13
+        c.setFillColorRGB(0.15, 0.83, 0.40)
+        c.rect(40, y - 10, 515, 16, fill=1, stroke=0)
+        c.setFillColorRGB(0, 0, 0)
+        c.drawString(46, y - 2, grp['label'])
+        y -= 18
+        c.setFont("Helvetica-Bold", 9)
+        c.drawString(40, y, "#")
+        c.drawString(55, y, "Producto")
+        c.drawRightString(400, y, "Cant")
+        c.drawRightString(470, y, "P.Unit")
+        c.drawRightString(545, y, "Total")
+        y -= 8
+        c.line(40, y, 555, y)
+        y -= 14
+        c.setFont("Helvetica", 9)
+        for it in grp['items']:
+            if y < 80:
+                c.showPage(); y = h - 40
+            c.drawString(40, y, str(row_no))
+            nombre = (it.get('nombre') or '')[:55]
+            c.drawString(55, y, nombre)
+            c.drawRightString(400, y, str(int(it.get('cantidad') or 0)))
+            c.drawRightString(470, y, f"{int(it.get('precio_final') or 0):,}".replace(',', '.'))
+            c.drawRightString(545, y, f"{int(it.get('total_item') or 0):,}".replace(',', '.'))
+            y -= 13
+            row_no += 1
+        c.setFont("Helvetica-Bold", 9)
+        c.drawRightString(470, y, f"Subtotal {grp['label']}")
+        c.drawRightString(545, y, f"{int(grp.get('subtotal') or 0):,}".replace(',', '.'))
+        y -= 18
+        c.setFont("Helvetica", 9)
     y -= 6
     c.line(330, y, 555, y)
     y -= 16
@@ -2785,16 +2851,17 @@ def public_view_no(no):
     token = ensure_public_token(cot['id'])
     pl = float(cot.get('price_list_desc_pct') or 0)
     items_raw = query("""SELECT i.*, c.nombre, c.descripcion, c.unidad, c.precio,
-                         c.aplica_iva, c.pct_iva, c.inst_default, c.config_default
+                         c.aplica_iva, c.pct_iva, c.inst_default, c.config_default, c.categoria
                          FROM items i JOIN catalogo c ON i.id_producto=c.id_producto
                          WHERE i.cot_id=? ORDER BY i.linea""", (cot['id'],))
     items = [{**it, **calcular_item(it, it, pl)} for it in items_raw]
+    grouped_items = agrupar_items_por_categoria(items)
     tots = calcular_cotizacion(cot['id'])
     params = {r['clave']: r['valor'] for r in query("SELECT * FROM parametros")}
     base = request.host_url.rstrip('/')
     import urllib.parse
     no_q = urllib.parse.quote(no, safe='')
-    return render_template_string(PUBLIC_VIEW_TEMPLATE, cot=cot, items=items, tots=tots, params=params,
+    return render_template_string(PUBLIC_VIEW_TEMPLATE, cot=cot, items=items, grouped_items=grouped_items, tots=tots, params=params,
         pdf_url=f"{base}/cotizacion/{no_q}/pdf", accept_url=f"{base}/cotizacion/{no_q}/accept")
 
 @app.post('/cotizacion/<path:no>/accept')
@@ -2987,6 +3054,7 @@ def _alias_match(qn, all_p):
         ({'bocina', 'techo'}, 'AV-007'),
         ({'parlante', 'techo'}, 'AV-007'),
         ({'amplificador', 'wiim'}, 'AV-001'),
+        ({'amplificador', 'ultra'}, 'AV-002'),
         ({'wiim', 'ultra'}, 'AV-002'),
         ({'sensor', 'presencia'}, 'DOM-015'),
         ({'camara', '360'}, 'CAM-001'),
