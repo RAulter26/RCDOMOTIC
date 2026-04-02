@@ -87,6 +87,8 @@ PUBLIC_API_WHITELIST = set(['/api/login', '/api/me'])
 
 CSRF_EXEMPT = set(['/api/login'])
 
+BOT_KEY = os.environ.get('BOT_KEY', 'test-key-local-123')
+
 def _csrf_token():
     tok = session.get('csrf_token')
     if not tok:
@@ -213,6 +215,9 @@ def _enforce_auth_for_api():
         return
     # endpoints públicos por token (si en el futuro se crean en /api/public/...)
     if p.startswith('/api/public/'):
+        return
+    # bot endpoints se autentican con X-Bot-Key, no con sesión
+    if p.startswith('/api/bot/'):
         return
 
     if not current_user():
@@ -2875,6 +2880,189 @@ def print_inventario():
         html += row
     html += """</tbody></table></body></html>"""
     return html
+
+
+# ─── BOT API (Telegram Cotizador) ────────────────────────────────────────────
+
+def _require_bot_key():
+    k = request.headers.get('X-Bot-Key') or request.headers.get('x-bot-key') or ''
+    if not k or k != BOT_KEY:
+        return jsonify({'ok': False, 'error': 'Unauthorized'}), 401
+    return None
+
+def _normalize_str(s):
+    s = str(s or '').lower().strip()
+    for a, b in [('á','a'),('é','e'),('í','i'),('ó','o'),('ú','u'),('ñ','n'),('ü','u')]:
+        s = s.replace(a, b)
+    s = re.sub(r'[^a-z0-9\s]', ' ', s)
+    return re.sub(r'\s+', ' ', s).strip()
+
+def _match_catalog(codigo_query):
+    qn = _normalize_str(codigo_query)
+    # 1. exact code match
+    prod = query("SELECT id_producto, nombre FROM catalogo WHERE activo=1 AND UPPER(id_producto)=?",
+                 (qn.upper(),), one=True)
+    if prod:
+        return {'found': True, 'id_producto': prod['id_producto'], 'nombre': prod['nombre']}
+    all_p = query("SELECT id_producto, nombre FROM catalogo WHERE activo=1")
+    exact, substr = [], []
+    q_words = set(qn.split())
+    for p in all_p:
+        pn = _normalize_str(p['nombre'])
+        if pn == qn:
+            return {'found': True, 'id_producto': p['id_producto'], 'nombre': p['nombre']}
+        p_words = set(pn.split())
+        if q_words and q_words.issubset(p_words):
+            exact.append(p)
+        elif qn in pn or pn in qn or len(q_words & p_words) >= max(1, len(q_words) - 1):
+            substr.append(p)
+    candidates = exact or substr
+    if len(candidates) == 1:
+        return {'found': True, 'id_producto': candidates[0]['id_producto'], 'nombre': candidates[0]['nombre']}
+    elif candidates:
+        return {'found': False, 'ambiguous': [{'id_producto': p['id_producto'], 'nombre': p['nombre']} for p in candidates[:5]]}
+    return {'found': False, 'ambiguous': []}
+
+@app.post('/api/bot/cotizacion')
+def bot_crear_cotizacion():
+    err = _require_bot_key()
+    if err: return err
+    d = request.json or {}
+    cliente = (d.get('cliente') or 'Sin especificar').strip()
+    items_ok, items_ambiguos, items_no_encontrados = [], [], []
+    for it in (d.get('items') or []):
+        codigo = str(it.get('codigo') or '').strip()
+        cant = max(1, int(it.get('cant') or 1))
+        notas_item = str(it.get('notas_item') or '').strip()
+        m = _match_catalog(codigo)
+        if m['found']:
+            items_ok.append({'id_producto': m['id_producto'], 'nombre': m['nombre'],
+                             'cantidad': cant, 'notas_item': notas_item})
+        elif m['ambiguous']:
+            items_ambiguos.append({'query': codigo, 'opciones': m['ambiguous']})
+        else:
+            items_no_encontrados.append({'query': codigo})
+    if not items_ok and not items_ambiguos:
+        faltan = ', '.join(x['query'] for x in items_no_encontrados)
+        return jsonify({'ok': False, 'error': 'No encontré ningún producto en el catálogo.',
+                        'items_no_encontrados': items_no_encontrados,
+                        'mensaje_telegram': f'No encontré ningún producto. ¿Quizás quisiste decir algo más? Productos no reconocidos: {faltan}'})
+    no_cot = next_no_cotizacion()
+    desc_pct = float(d.get('descuento_pct') or 0) / 100
+    ant_pct = float(d.get('anticipo_pct') or 70) / 100
+    cot_id = execute("""INSERT INTO cotizaciones
+        (no_cotizacion,cliente,telefono,ciudad,proyecto,tipo_cotizacion,forma_pago,
+         anticipo_pct,descuento_pct,descuento_val,notas,vendedor,etapa,estado)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+        (no_cot, cliente, d.get('telefono',''), d.get('ciudad',''), d.get('proyecto',''),
+         'MIXTA', '70% - 30%', ant_pct, desc_pct, 0, d.get('notas',''), 'Bot', 'COTIZADA', 'BORRADOR'))
+    for idx, it in enumerate(items_ok, 1):
+        execute("INSERT INTO items (cot_id,linea,id_producto,cantidad,precio_manual,inst_manual,cfg_manual,notas_item) VALUES (?,?,?,?,0,0,0,?)",
+                (cot_id, idx, it['id_producto'], it['cantidad'], it['notas_item']))
+    lines = [f"*Borrador {no_cot}* — {cliente}"]
+    if d.get('ciudad'): lines.append(f"Ciudad: {d['ciudad']}")
+    if d.get('proyecto'): lines.append(f"Proyecto: {d['proyecto']}")
+    lines.append("")
+    for it in items_ok:
+        lines.append(f"• {it['cantidad']}x {it['nombre']} ({it['id_producto']})")
+    if items_ambiguos:
+        lines.append("\n⚠️ Ambiguos (elige abajo):")
+        for a in items_ambiguos: lines.append(f'  "{a["query"]}" — varias opciones')
+    if items_no_encontrados:
+        lines.append(f"\n❌ No encontré: {', '.join(x['query'] for x in items_no_encontrados)}")
+    return jsonify({'ok': True, 'id': cot_id, 'no_cotizacion': no_cot,
+                    'resumen_texto': '\n'.join(lines),
+                    'items_ambiguos': items_ambiguos,
+                    'items_no_encontrados': items_no_encontrados})
+
+@app.post('/api/bot/cotizacion/accion')
+def bot_accion_cotizacion():
+    err = _require_bot_key()
+    if err: return err
+    d = request.json or {}
+    cot_id = d.get('id')
+    accion = str(d.get('accion') or '').lower().strip()
+    cot = query("SELECT * FROM cotizaciones WHERE id=?", (cot_id,), one=True)
+    if not cot:
+        return jsonify({'ok': False, 'error': f'Cotización {cot_id} no encontrada.'})
+    if accion == 'confirmar':
+        execute("UPDATE cotizaciones SET estado='ENVIADA' WHERE id=?", (cot_id,))
+        return jsonify({'ok': True, 'estado': 'ENVIADA',
+                        'mensaje_telegram': f"✅ Cotización {cot['no_cotizacion']} confirmada y enviada a revisión."})
+    elif accion == 'cancelar':
+        execute("UPDATE cotizaciones SET estado='RECHAZADA' WHERE id=?", (cot_id,))
+        return jsonify({'ok': True, 'estado': 'RECHAZADA',
+                        'mensaje_telegram': f"❌ Cotización {cot['no_cotizacion']} cancelada."})
+    return jsonify({'ok': False, 'error': f'Acción desconocida: {accion}'})
+
+@app.post('/api/bot/cotizacion/<int:cot_id>/agregar_item')
+def bot_agregar_item(cot_id):
+    err = _require_bot_key()
+    if err: return err
+    d = request.json or {}
+    codigo = str(d.get('codigo') or '').strip().upper()
+    cant = max(1, int(d.get('cant') or 1))
+    cot = query("SELECT * FROM cotizaciones WHERE id=?", (cot_id,), one=True)
+    if not cot:
+        return jsonify({'ok': False, 'error': f'Cotización {cot_id} no encontrada.'})
+    prod = query("SELECT * FROM catalogo WHERE id_producto=? AND activo=1", (codigo,), one=True)
+    if not prod:
+        return jsonify({'ok': False, 'error': f'Producto {codigo} no encontrado en catálogo.'})
+    existing = query("SELECT * FROM items WHERE cot_id=? AND id_producto=?", (cot_id, codigo), one=True)
+    if existing:
+        execute("UPDATE items SET cantidad=cantidad+? WHERE id=?", (cant, existing['id']))
+    else:
+        ml = query("SELECT MAX(linea) as ml FROM items WHERE cot_id=?", (cot_id,), one=True)
+        execute("INSERT INTO items (cot_id,linea,id_producto,cantidad,precio_manual,inst_manual,cfg_manual,notas_item) VALUES (?,?,?,?,0,0,0,'')",
+                (cot_id, (ml['ml'] or 0) + 1, codigo, cant))
+    return jsonify({'ok': True,
+                    'mensaje_telegram': f"✅ Agregado: {cant}x {prod['nombre']} a la cotización {cot['no_cotizacion']}."})
+
+@app.post('/api/bot/transcribir-audio')
+def bot_transcribir_audio():
+    """Recibe audio en base64 y transcribe vía OpenAI Whisper."""
+    err = _require_bot_key()
+    if err: return err
+    openai_key = os.environ.get('OPENAI_API_KEY', '')
+    if not openai_key:
+        return jsonify({'ok': False, 'error': 'OPENAI_API_KEY no configurada.'}), 500
+    d = request.json or {}
+    audio_b64 = d.get('audio_b64') or ''
+    filename = d.get('filename') or 'audio.ogg'
+    mimetype = d.get('mimetype') or 'audio/ogg'
+    prompt = d.get('prompt') or ''
+    model = d.get('model') or 'whisper-1'
+    if not audio_b64:
+        return jsonify({'ok': False, 'error': 'audio_b64 vacío.'}), 400
+    try:
+        import base64 as _b64
+        audio_bytes = _b64.b64decode(audio_b64)
+    except Exception as e:
+        return jsonify({'ok': False, 'error': f'Error decodificando audio: {e}'}), 400
+    boundary = secrets.token_hex(16)
+    parts = []
+    for name, val in [('model', model), ('language', 'es'), ('response_format', 'json')]:
+        parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="{name}"\r\n\r\n{val}'.encode())
+    if prompt:
+        parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="prompt"\r\n\r\n{prompt}'.encode())
+    parts.append(
+        f'--{boundary}\r\nContent-Disposition: form-data; name="file"; filename="{filename}"\r\nContent-Type: {mimetype}\r\n\r\n'.encode()
+        + audio_bytes)
+    parts.append(f'--{boundary}--'.encode())
+    body = b'\r\n'.join(parts)
+    req = urllib.request.Request(
+        'https://api.openai.com/v1/audio/transcriptions', data=body,
+        headers={'Authorization': f'Bearer {openai_key}',
+                 'Content-Type': f'multipart/form-data; boundary={boundary}'},
+        method='POST')
+    try:
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            result = json.loads(resp.read().decode())
+        return jsonify({'ok': True, 'text': result.get('text', '')})
+    except urllib.error.HTTPError as e:
+        return jsonify({'ok': False, 'error': f'OpenAI {e.code}: {e.read().decode()}'}), 502
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 502
 
 
 if __name__ == '__main__':
