@@ -688,7 +688,11 @@ CATEGORY_LABELS = {
 
 CATEGORY_ORDER = ['DOMOTICA', 'CCTV', 'AUDIOVISUAL', 'REDES', 'CERRADURAS', 'OTROS', 'SERVICIOS']
 
-def agrupar_items_por_categoria(items):
+QUOTE_ACCENT_SOFT = '#B7C4BB'
+QUOTE_ACCENT_SOFT_BG = '#EDF2EE'
+QUOTE_ACCENT_SOFT_TEXT = '#2F4137'
+
+def agrupar_items_por_categoria(items, total_key='total_item'):
     ordered_groups = []
     groups = {}
     for it in items:
@@ -703,11 +707,40 @@ def agrupar_items_por_categoria(items):
             groups[cat] = group
             ordered_groups.append(group)
         groups[cat]['items'].append(it)
-        groups[cat]['subtotal'] += float(it.get('total_item') or 0)
+        groups[cat]['subtotal'] += float(it.get(total_key) or 0)
     ordered_groups.sort(key=lambda g: (CATEGORY_ORDER.index(g['categoria']) if g['categoria'] in CATEGORY_ORDER else 999, g['label']))
     for g in ordered_groups:
         g['subtotal'] = round(g['subtotal'], 0)
     return ordered_groups
+
+def preparar_presentacion_cotizacion(items):
+    display_items = []
+    productos_total = 0.0
+    inst_total = 0.0
+    cfg_total = 0.0
+    for it in items:
+        row = dict(it)
+        row['display_total'] = round(float(row.get('subtotal') or 0) + float(row.get('iva_monto') or 0), 0)
+        row['inst_line_total'] = round(float(row.get('inst_final') or 0) * float(row.get('cantidad') or 0), 0)
+        row['cfg_line_total'] = round(float(row.get('cfg_final') or 0), 0)
+        productos_total += row['display_total']
+        inst_total += row['inst_line_total']
+        cfg_total += row['cfg_line_total']
+        display_items.append(row)
+
+    service_items = []
+    if round(inst_total, 0) > 0:
+        service_items.append({'label': 'Instalación total', 'total': round(inst_total, 0)})
+    if round(cfg_total, 0) > 0:
+        service_items.append({'label': 'Configuración total', 'total': round(cfg_total, 0)})
+
+    return {
+        'items': display_items,
+        'grouped_items': agrupar_items_por_categoria(display_items, total_key='display_total'),
+        'service_items': service_items,
+        'productos_total': round(productos_total, 0),
+        'servicios_total': round(inst_total + cfg_total, 0),
+    }
 
 def next_no_cotizacion():
     p = query("SELECT valor FROM parametros WHERE clave='prefijo_cot'", one=True)
@@ -2446,10 +2479,10 @@ PRINT_TEMPLATE = """<!DOCTYPE html>
   .cover img.logo{height:54px;object-fit:contain;filter:drop-shadow(0 2px 4px rgba(0,0,0,.25))}
   .cover .title{font-size:22px;font-weight:800;letter-spacing:.5px}
   .cover .sub{font-size:11px;opacity:.85;margin-top:2px;line-height:1.35}
-  .cover .box{background:{{ accent }};color:#000;padding:10px 14px;border-radius:10px;text-align:right;min-width:210px}
+  .cover .box{background:{{ accent_soft }};color:{{ accent_soft_text }};padding:10px 14px;border-radius:10px;text-align:right;min-width:210px}
   .cover .box .num{font-size:18px;font-weight:900}
   .cover .box .meta{font-size:11px;font-weight:700}
-  .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;padding-bottom:12px;border-bottom:3px solid {{ accent }}}
+  .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;padding-bottom:12px;border-bottom:3px solid {{ accent_soft }}}
   .header-left{display:flex;align-items:center;gap:12px}
   .header-left img.logo{height:48px;object-fit:contain}
   .brand{font-size:22px;font-weight:700;color:{{ primary }}}
@@ -2465,14 +2498,15 @@ PRINT_TEMPLATE = """<!DOCTYPE html>
   td{padding:4px;border-bottom:1px solid #e0e0e0;vertical-align:middle}
   tr:nth-child(even) td{background:#f5f8ff}
   .right{text-align:right}.center{text-align:center}
-  .cat-band{background:{{ accent }};color:#000;font-weight:800;padding:6px 10px;border-radius:8px 8px 0 0;margin-top:10px;font-size:11px;letter-spacing:.3px}
-  .cat-subtotal td{background:#eef7ff !important;font-weight:800}
+  .cat-band{background:{{ accent_soft }};color:{{ accent_soft_text }};font-weight:800;padding:6px 10px;border-radius:8px 8px 0 0;margin-top:10px;font-size:11px;letter-spacing:.3px}
+  .cat-subtotal td{background:{{ accent_soft_bg }} !important;font-weight:800}
   .img-cell{width:50px;text-align:center}
   .img-cell img{width:45px;height:45px;object-fit:contain;border-radius:3px;border:1px solid #e0e0e0}
   .img-cell .no-img{width:45px;height:45px;display:inline-flex;align-items:center;justify-content:center;background:#f0f0f0;border-radius:3px;color:#bbb;font-size:8px;text-align:center}
   .totals{float:right;width:320px;margin-top:8px}
   .totals table td{border:none;padding:3px 7px}
-  .totals .grand{background:{{ accent }};color:#000;font-weight:700;font-size:13px}
+  .totals .grand{background:{{ accent_soft }};color:{{ accent_soft_text }};font-weight:700;font-size:13px}
+  .service-table td{background:#fffdfa}
   .footer{margin-top:30px;padding-top:10px;border-top:1px solid #ccc;font-size:10px;color:#666;display:flex;justify-content:space-between}
   .sign{display:flex;gap:40px;margin-top:20px}
   .sign-line{border-top:1px solid #555;width:200px;padding-top:4px;font-size:10px;text-align:center}
@@ -2481,7 +2515,7 @@ PRINT_TEMPLATE = """<!DOCTYPE html>
 {% if logo_exists %}<div class="watermark"><img src="{{ watermark_url }}" alt=""></div>{% endif %}
 <div class="content">
 <div class="no-print" style="margin-bottom:16px">
-  <button onclick="window.print()" style="background:{{ accent }};color:#000;border:none;padding:8px 20px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600">🖨 Imprimir / Guardar PDF</button>
+  <button onclick="window.print()" style="background:{{ accent_soft }};color:{{ accent_soft_text }};border:none;padding:8px 20px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600">Imprimir / Guardar PDF</button>
   <button onclick="window.close()" style="background:#666;color:#fff;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;margin-left:8px">✕ Cerrar</button>
 </div>
 <div class="cover">
@@ -2510,11 +2544,11 @@ PRINT_TEMPLATE = """<!DOCTYPE html>
   <div class="info-row"><span class="info-label">Teléfono:</span> {{ cot.telefono or '—' }}</div>
   <div class="info-row"><span class="info-label">Forma pago:</span> {{ cot.forma_pago }}</div>
 </div>
-<div class="section-title">DETALLE DE PRODUCTOS Y SERVICIOS</div>
+<div class="section-title">DETALLE DE PRODUCTOS</div>
 {% for grp in grouped_items %}
 <div class="cat-band">{{ grp['label'] }}</div>
 <table><thead>
-<tr><th>#</th><th class="img-cell">Img</th><th>ID</th><th>Producto</th><th>Descripci??n</th><th class="center">Und</th><th class="center">Cant.</th><th class="right">P.Unit.</th><th class="right">IVA</th><th class="right">Inst.</th><th class="right">TOTAL</th></tr>
+<tr><th>#</th><th class="img-cell">Img</th><th>ID</th><th>Producto</th><th>Descripcion</th><th class="center">Und</th><th class="center">Cant.</th><th class="right">P.Unit.</th><th class="right">IVA</th><th class="right">TOTAL</th></tr>
 </thead><tbody>
 {% for it in grp['items'] %}
 <tr><td class="center">{{ loop.index }}</td>
@@ -2525,15 +2559,26 @@ PRINT_TEMPLATE = """<!DOCTYPE html>
 <td class="center">{{ it.unidad }}</td>
 <td class="center">{{ it.cantidad|int }}</td>
 <td class="right">$ {{ "{:,.0f}".format(it.precio_final).replace(",", ".") }}</td>
-<td class="right">{% if it.iva_monto %}$ {{ "{:,.0f}".format(it.iva_monto).replace(",", ".") }}{% else %}???{% endif %}</td>
-<td class="right">{% if it.inst_final > 0 %}$ {{ "{:,.0f}".format(it.inst_final * it.cantidad).replace(",", ".") }}{% else %}???{% endif %}</td>
-<td class="right"><strong>$ {{ "{:,.0f}".format(it.total_item).replace(",", ".") }}</strong></td></tr>
+<td class="right">{% if it.iva_monto %}$ {{ "{:,.0f}".format(it.iva_monto).replace(",", ".") }}{% else %}&mdash;{% endif %}</td>
+<td class="right"><strong>$ {{ "{:,.0f}".format(it.display_total).replace(",", ".") }}</strong></td></tr>
 {% endfor %}
-<tr class="cat-subtotal"><td colspan="10" class="right">Subtotal {{ grp['label'] }}</td><td class="right">$ {{ "{:,.0f}".format(grp.subtotal).replace(",", ".") }}</td></tr>
+<tr class="cat-subtotal"><td colspan="9" class="right">Subtotal {{ grp['label'] }}</td><td class="right">$ {{ "{:,.0f}".format(grp.subtotal).replace(",", ".") }}</td></tr>
 </tbody></table>
 {% endfor %}
+{% if service_items %}
+<div class="cat-band">SERVICIOS COMPLEMENTARIOS</div>
+<table class="service-table"><thead>
+<tr><th>Concepto</th><th class="right">Total</th></tr>
+</thead><tbody>
+{% for svc in service_items %}
+<tr><td><strong>{{ svc.label }}</strong></td><td class="right"><strong>$ {{ "{:,.0f}".format(svc.total).replace(",", ".") }}</strong></td></tr>
+{% endfor %}
+<tr class="cat-subtotal"><td class="right">Subtotal servicios complementarios</td><td class="right">$ {{ "{:,.0f}".format(servicios_total).replace(",", ".") }}</td></tr>
+</tbody></table>
+{% endif %}
 <div class="totals"><table>
-<tr><td>Subtotal:</td><td class="right">$ {{ "{:,.0f}".format(tots.total_bruto).replace(",",".") }}</td></tr>
+<tr><td>Subtotal productos:</td><td class="right">$ {{ "{:,.0f}".format(productos_total).replace(",",".") }}</td></tr>
+{% if servicios_total > 0 %}<tr><td>Subtotal servicios:</td><td class="right">$ {{ "{:,.0f}".format(servicios_total).replace(",",".") }}</td></tr>{% endif %}
 {% if tots.descuento > 0 %}<tr><td>(-) Descuento:</td><td class="right" style="color:#C00000">- $ {{ "{:,.0f}".format(tots.descuento).replace(",",".") }}</td></tr>{% endif %}
 <tr class="grand"><td>TOTAL COP:</td><td class="right">$ {{ "{:,.0f}".format(tots.total_final).replace(",",".") }}</td></tr>
 <tr><td>
@@ -2542,7 +2587,7 @@ PRINT_TEMPLATE = """<!DOCTYPE html>
 <tr><td>Abonado:</td><td class="right">$ {{ "{:,.0f}".format(tots.abonado_val).replace(",",".") }}</td></tr>
 <tr><td>Saldo:</td><td class="right">$ {{ "{:,.0f}".format(tots.saldo_val).replace(",",".") }}</td></tr>
 </table></div><div style="clear:both"></div>
-{% if cot.notas %}<div style="margin-top:10px;padding:7px 10px;background:#f5f5f5;border-left:3px solid {{ accent }};font-size:11px"><strong>Notas:</strong> {{ cot.notas }}</div>{% endif %}
+{% if cot.notas %}<div style="margin-top:10px;padding:7px 10px;background:#f5f5f5;border-left:3px solid {{ accent_soft }};font-size:11px"><strong>Notas:</strong> {{ cot.notas }}</div>{% endif %}
 <div class="sign"><div class="sign-line">Firma Cliente<br>{{ cot.cliente }}</div><div class="sign-line">RC DOMOTIC<br>{{ params.contacto }}</div></div>
 <div class="footer"><div>✔ Garantía: {{ params.garantia }}<br>✔ Vigencia: {{ params.vigencia_dias }} días · ✔ Plazo: {{ params.plazo_entrega }}</div>
 <div style="text-align:right">Consignaciones: {{ params.banco }}<br>Cta. {{ params.cuenta }} · {{ params.titular }}<br>CC {{ params.nit }}</div></div>
@@ -2560,7 +2605,9 @@ def print_cotizacion(cot_id):
     items = []
     for it in items_raw:
         items.append({**it, **calcular_item(it, it, pl)})
-    grouped_items = agrupar_items_por_categoria(items)
+    presentation = preparar_presentacion_cotizacion(items)
+    grouped_items = presentation['grouped_items']
+    service_items = presentation['service_items']
     tots = calcular_cotizacion(cot_id)
     params = {r['clave']: r['valor'] for r in query("SELECT * FROM parametros")}
     lp = params.get('logo_path','/static/brand_logo.png')
@@ -2571,8 +2618,10 @@ def print_cotizacion(cot_id):
     ts = int(time.time())
     logo_url = f"{lp}?v={ts}" if le else lp
     watermark_url = f"{wp}?v={ts}" if we else wp
-    return render_template_string(PRINT_TEMPLATE, cot=cot, items=items, grouped_items=grouped_items, tots=tots, params=params,
+    return render_template_string(PRINT_TEMPLATE, cot=cot, items=presentation['items'], grouped_items=grouped_items,
+        service_items=service_items, productos_total=presentation['productos_total'], servicios_total=presentation['servicios_total'], tots=tots, params=params,
         primary=params.get('brand_primary','#0F0F0F'), accent=params.get('brand_accent','#25D366'),
+        accent_soft=QUOTE_ACCENT_SOFT, accent_soft_bg=QUOTE_ACCENT_SOFT_BG, accent_soft_text=QUOTE_ACCENT_SOFT_TEXT,
         logo_url=logo_url, watermark_url=watermark_url, logo_exists=le, watermark_exists=we)
 
 
@@ -2586,14 +2635,14 @@ PUBLIC_VIEW_TEMPLATE = """<!doctype html><html lang='es'><head>
   .wrap{max-width:960px; margin:0 auto; padding:20px 16px;}
   .card{background:#fff; border-radius:18px; box-shadow:0 1px 3px rgba(0,0,0,.06), 0 8px 24px rgba(0,0,0,.08); overflow:hidden; border:1px solid rgba(0,0,0,.04)}
   .top{padding:20px 24px; display:flex; gap:16px; align-items:center; border-bottom:1px solid #f0f0f0; background:#fafafa}
-  .logo{width:54px; height:54px; border-radius:14px; background:#0f0f0f; display:flex; align-items:center; justify-content:center; color:#25D366; font-weight:900; font-size:18px; letter-spacing:-1px; flex-shrink:0}
+  .logo{width:54px; height:54px; border-radius:14px; background:#0f0f0f; display:flex; align-items:center; justify-content:center; color:#9FB3A6; font-weight:900; font-size:18px; letter-spacing:-1px; flex-shrink:0}
   .grow{flex:1; min-width:0}
   .h1{font-size:20px; font-weight:800; margin:0; letter-spacing:-.3px}
   .sub{font-size:12px; color:#6b7280; margin-top:2px}
   .btn{display:inline-flex; align-items:center; gap:6px; padding:10px 16px; border-radius:10px; background:#0f0f0f; color:#fff; text-decoration:none; font-weight:700; font-size:12px; transition:all .2s; border:none; cursor:pointer}
   .btn:hover{background:#222}
-  .btn2{background:#25D366; color:#052e16}
-  .btn2:hover{background:#1eba56}
+  .btn2{background:#B7C4BB; color:#2F4137}
+  .btn2:hover{background:#AAB8AE}
   .content{padding:24px}
   .grid{display:grid; grid-template-columns:1fr 1fr; gap:10px; font-size:13px; color:#1a1d21}
   .row{padding:12px 14px; background:#f8f9fa; border-radius:10px; border:1px solid #f0f0f0}
@@ -2602,21 +2651,21 @@ PUBLIC_VIEW_TEMPLATE = """<!doctype html><html lang='es'><head>
   th,td{border-bottom:1px solid #f0f2f5; padding:12px 10px; vertical-align:top}
   th{background:#0f0f0f; color:rgba(255,255,255,.92); font-size:11px; text-align:left; text-transform:uppercase; letter-spacing:.3px; font-weight:700}
   th:first-child{border-radius:10px 0 0 0} th:last-child{border-radius:0 10px 0 0}
-  tbody tr:hover{background:rgba(37,211,102,.04)}
+  tbody tr:hover{background:rgba(183,196,187,.18)}
   .r{text-align:right}
-  .cat-band{margin-top:16px;padding:10px 14px;background:#25D366;color:#052e16;border-radius:12px 12px 0 0;font-weight:900;font-size:12px;letter-spacing:.3px}
-  .cat-subtotal td{background:#eef7ff;font-weight:800}
+  .cat-band{margin-top:16px;padding:10px 14px;background:#B7C4BB;color:#2F4137;border-radius:12px 12px 0 0;font-weight:900;font-size:12px;letter-spacing:.3px}
+  .cat-subtotal td{background:#EDF2EE;font-weight:800}
   .tot{margin-top:18px; display:flex; justify-content:flex-end}
   .tot table{width:360px}
   .tot td{border-bottom:1px solid #f0f2f5; padding:8px 10px}
   .stamp{display:inline-flex; align-items:center; gap:6px; padding:8px 14px; border-radius:10px; font-weight:800; font-size:13px}
-  .ok{background:#f0fdf4; color:#15803d; border:1.5px solid #86efac}
+  .ok{background:#EEF4F0; color:#2F4137; border:1.5px solid #B7C4BB}
   .warn{background:#fffbeb; color:#92400e; border:1.5px solid #fcd34d}
   .foot{font-size:12px; color:#6b7280; margin-top:20px; display:flex; justify-content:space-between; gap:14px; flex-wrap:wrap; padding-top:16px; border-top:1px solid #f0f2f5}
   .accept{margin-top:16px; padding:16px; border-radius:14px; background:#f8f9fa; border:1px solid #e5e7eb}
   input,button{font:inherit}
   input[type=text]{width:100%; padding:11px 14px; border-radius:10px; border:1.5px solid #e5e7eb; margin-top:8px; font-size:14px; transition:border-color .2s, box-shadow .2s}
-  input[type=text]:focus{border-color:#25D366; box-shadow:0 0 0 3px rgba(37,211,102,.1); outline:none}
+  input[type=text]:focus{border-color:#B7C4BB; box-shadow:0 0 0 3px rgba(183,196,187,.22); outline:none}
   @media(max-width:680px){.grid{grid-template-columns:1fr}.tot table{width:100%}.top{flex-wrap:wrap}}
 </style></head><body>
   <div class='wrap'>
@@ -2658,8 +2707,8 @@ PUBLIC_VIEW_TEMPLATE = """<!doctype html><html lang='es'><head>
                 <td><strong>{{ it.nombre }}</strong><br><span style='color:#555;font-size:11px'>{{ it.descripcion or '' }}</span></td>
                 <td class='r'>{{ it.cantidad|int }}</td>
                 <td class='r'>$ {{ "{:,.0f}".format(it.precio_final).replace(",", ".") }}</td>
-                <td class='r'>{% if it.iva_monto %}$ {{ "{:,.0f}".format(it.iva_monto).replace(",", ".") }}{% else %}???{% endif %}</td>
-                <td class='r'><strong>$ {{ "{:,.0f}".format(it.total_item).replace(",", ".") }}</strong></td>
+                <td class='r'>{% if it.iva_monto %}$ {{ "{:,.0f}".format(it.iva_monto).replace(",", ".") }}{% else %}&mdash;{% endif %}</td>
+                <td class='r'><strong>$ {{ "{:,.0f}".format(it.display_total).replace(",", ".") }}</strong></td>
               </tr>
             {% endfor %}
             <tr class='cat-subtotal'>
@@ -2669,9 +2718,28 @@ PUBLIC_VIEW_TEMPLATE = """<!doctype html><html lang='es'><head>
           </tbody>
         </table>
         {% endfor %}
+        {% if service_items %}
+        <div class='cat-band'>SERVICIOS COMPLEMENTARIOS</div>
+        <table>
+          <thead><tr><th>Concepto</th><th class='r' style='width:160px'>Total</th></tr></thead>
+          <tbody>
+            {% for svc in service_items %}
+              <tr>
+                <td><strong>{{ svc.label }}</strong></td>
+                <td class='r'><strong>$ {{ "{:,.0f}".format(svc.total).replace(",", ".") }}</strong></td>
+              </tr>
+            {% endfor %}
+            <tr class='cat-subtotal'>
+              <td class='r'>Subtotal servicios complementarios</td>
+              <td class='r'>$ {{ "{:,.0f}".format(servicios_total).replace(",", ".") }}</td>
+            </tr>
+          </tbody>
+        </table>
+        {% endif %}
         <div class='tot'>
           <table>
-            <tr><td>Subtotal</td><td class='r'>$ {{ "{:,.0f}".format(tots.total_bruto).replace(",",".") }}</td></tr>
+            <tr><td>Subtotal productos</td><td class='r'>$ {{ "{:,.0f}".format(productos_total).replace(",",".") }}</td></tr>
+            {% if servicios_total > 0 %}<tr><td>Subtotal servicios</td><td class='r'>$ {{ "{:,.0f}".format(servicios_total).replace(",",".") }}</td></tr>{% endif %}
             {% if tots.descuento > 0 %}<tr><td>(-) Descuento</td><td class='r' style='color:#C00000'>- $ {{ "{:,.0f}".format(tots.descuento).replace(",",".") }}</td></tr>{% endif %}
             <tr><td style='font-weight:900'>TOTAL</td><td class='r' style='font-weight:900'>$ {{ "{:,.0f}".format(tots.total_final).replace(",",".") }}</td></tr>
             <tr><td>
@@ -2737,11 +2805,14 @@ def public_view(token):
                          FROM items i JOIN catalogo c ON i.id_producto=c.id_producto
                          WHERE i.cot_id=? ORDER BY i.linea""", (cot['id'],))
     items = [{**it, **calcular_item(it, it, pl)} for it in items_raw]
-    grouped_items = agrupar_items_por_categoria(items)
+    presentation = preparar_presentacion_cotizacion(items)
+    grouped_items = presentation['grouped_items']
+    service_items = presentation['service_items']
     tots = calcular_cotizacion(cot['id'])
     params = {r['clave']: r['valor'] for r in query("SELECT * FROM parametros")}
     base = request.host_url.rstrip('/')
-    return render_template_string(PUBLIC_VIEW_TEMPLATE, cot=cot, items=items, grouped_items=grouped_items, tots=tots, params=params,
+    return render_template_string(PUBLIC_VIEW_TEMPLATE, cot=cot, items=presentation['items'], grouped_items=grouped_items,
+        service_items=service_items, productos_total=presentation['productos_total'], servicios_total=presentation['servicios_total'], tots=tots, params=params,
         pdf_url=f"{base}/q/{token}/pdf", accept_url=f"{base}/q/{token}/accept")
 
 @app.post('/q/<token>/accept')
@@ -2771,7 +2842,9 @@ def public_pdf(token):
                          FROM items i JOIN catalogo c ON i.id_producto=c.id_producto
                          WHERE i.cot_id=? ORDER BY i.linea""", (cot['id'],))
     items = [{**it, **calcular_item(it, it, pl)} for it in items_raw]
-    grouped_items = agrupar_items_por_categoria(items)
+    presentation = preparar_presentacion_cotizacion(items)
+    grouped_items = presentation['grouped_items']
+    service_items = presentation['service_items']
     tots = calcular_cotizacion(cot['id'])
     params = {r['clave']: r['valor'] for r in query("SELECT * FROM parametros")}
     from io import BytesIO
@@ -2794,9 +2867,9 @@ def public_pdf(token):
     for grp in grouped_items:
         if y < 120:
             c.showPage(); y = h - 40
-        c.setFillColorRGB(0.15, 0.83, 0.40)
+        c.setFillColorRGB(0.72, 0.77, 0.73)
         c.rect(40, y - 10, 515, 16, fill=1, stroke=0)
-        c.setFillColorRGB(0, 0, 0)
+        c.setFillColorRGB(0.18, 0.25, 0.22)
         c.drawString(46, y - 2, grp['label'])
         y -= 18
         c.setFont("Helvetica-Bold", 9)
@@ -2817,7 +2890,7 @@ def public_pdf(token):
             c.drawString(55, y, nombre)
             c.drawRightString(400, y, str(int(it.get('cantidad') or 0)))
             c.drawRightString(470, y, f"{int(it.get('precio_final') or 0):,}".replace(',', '.'))
-            c.drawRightString(545, y, f"{int(it.get('total_item') or 0):,}".replace(',', '.'))
+            c.drawRightString(545, y, f"{int(it.get('display_total') or 0):,}".replace(',', '.'))
             y -= 13
             row_no += 1
         c.setFont("Helvetica-Bold", 9)
@@ -2825,9 +2898,41 @@ def public_pdf(token):
         c.drawRightString(545, y, f"{int(grp.get('subtotal') or 0):,}".replace(',', '.'))
         y -= 18
         c.setFont("Helvetica", 9)
+    if service_items:
+        if y < 120:
+            c.showPage(); y = h - 40
+        c.setFillColorRGB(0.72, 0.77, 0.73)
+        c.rect(40, y - 10, 515, 16, fill=1, stroke=0)
+        c.setFillColorRGB(0.18, 0.25, 0.22)
+        c.setFont("Helvetica-Bold", 9)
+        c.drawString(46, y - 2, "SERVICIOS COMPLEMENTARIOS")
+        y -= 20
+        c.setFont("Helvetica", 9)
+        for svc in service_items:
+            if y < 80:
+                c.showPage(); y = h - 40
+            c.drawString(55, y, svc['label'])
+            c.drawRightString(545, y, f"{int(svc.get('total') or 0):,}".replace(',', '.'))
+            y -= 13
+        c.setFont("Helvetica-Bold", 9)
+        c.drawRightString(470, y, "Subtotal servicios")
+        c.drawRightString(545, y, f"{int(presentation.get('servicios_total') or 0):,}".replace(',', '.'))
+        y -= 18
+        c.setFont("Helvetica", 9)
     y -= 6
     c.line(330, y, 555, y)
     y -= 16
+    c.drawRightString(470, y, "Subtotal productos")
+    c.drawRightString(545, y, f"{int(presentation.get('productos_total') or 0):,}".replace(',', '.'))
+    y -= 14
+    if presentation.get('servicios_total'):
+        c.drawRightString(470, y, "Subtotal servicios")
+        c.drawRightString(545, y, f"{int(presentation.get('servicios_total') or 0):,}".replace(',', '.'))
+        y -= 14
+    if tots.get('descuento', 0):
+        c.drawRightString(470, y, "Descuento")
+        c.drawRightString(545, y, f"- {int(tots.get('descuento',0)):,}".replace(',', '.'))
+        y -= 14
     c.setFont("Helvetica-Bold", 10)
     c.drawRightString(470, y, "TOTAL")
     c.drawRightString(545, y, f"{int(tots.get('total_final',0)):,}".replace(',', '.'))
@@ -2855,13 +2960,16 @@ def public_view_no(no):
                          FROM items i JOIN catalogo c ON i.id_producto=c.id_producto
                          WHERE i.cot_id=? ORDER BY i.linea""", (cot['id'],))
     items = [{**it, **calcular_item(it, it, pl)} for it in items_raw]
-    grouped_items = agrupar_items_por_categoria(items)
+    presentation = preparar_presentacion_cotizacion(items)
+    grouped_items = presentation['grouped_items']
+    service_items = presentation['service_items']
     tots = calcular_cotizacion(cot['id'])
     params = {r['clave']: r['valor'] for r in query("SELECT * FROM parametros")}
     base = request.host_url.rstrip('/')
     import urllib.parse
     no_q = urllib.parse.quote(no, safe='')
-    return render_template_string(PUBLIC_VIEW_TEMPLATE, cot=cot, items=items, grouped_items=grouped_items, tots=tots, params=params,
+    return render_template_string(PUBLIC_VIEW_TEMPLATE, cot=cot, items=presentation['items'], grouped_items=grouped_items,
+        service_items=service_items, productos_total=presentation['productos_total'], servicios_total=presentation['servicios_total'], tots=tots, params=params,
         pdf_url=f"{base}/cotizacion/{no_q}/pdf", accept_url=f"{base}/cotizacion/{no_q}/accept")
 
 @app.post('/cotizacion/<path:no>/accept')
