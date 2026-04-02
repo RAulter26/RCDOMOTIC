@@ -3,7 +3,7 @@ Flask + SQLite3 | Sin dependencias de nube | Funciona en local o servidor
 v3: Fix Excel, Selector categorías, Merge duplicados, Logo+Watermark PDF,
     Dashboard APROBADA, Catálogo Pro, Comandos seguros
 """
-import sqlite3, os, json, datetime, re, uuid, traceback, secrets, time, ipaddress, socket
+import sqlite3, os, json, datetime, re, uuid, traceback, secrets, time, ipaddress, socket, unicodedata
 from functools import wraps
 from flask import (Flask, request, jsonify, g, send_file, session,
                    render_template_string, send_from_directory, abort)
@@ -2892,31 +2892,134 @@ def _require_bot_key():
 
 def _normalize_str(s):
     s = str(s or '').lower().strip()
+    s = ''.join(ch for ch in unicodedata.normalize('NFKD', s) if not unicodedata.combining(ch))
     for a, b in [('á','a'),('é','e'),('í','i'),('ó','o'),('ú','u'),('ñ','n'),('ü','u')]:
         s = s.replace(a, b)
     s = re.sub(r'[^a-z0-9\s]', ' ', s)
+    s = re.sub(r'\s+', ' ', s).strip()
+    replacements = [
+        ('orvivo', 'orvibo'),
+        ('orbivo', 'orvibo'),
+        ('orvbio', 'orvibo'),
+        ('decos', 'deco'),
+        ('interruptores', 'interruptor'),
+        ('grises', 'gris'),
+        ('pantallas', 'pantalla'),
+        ('grandes', 'grande'),
+        ('parlantes', 'parlante'),
+        ('sensores', 'sensor'),
+        ('camaras', 'camara'),
+        ('tomacorrientes', 'tomacorriente'),
+        ('camarabala', 'camara bala'),
+        ('lumion', 'lumios'),
+    ]
+    for old, new in replacements:
+        s = re.sub(rf'\b{old}\b', new, s)
     return re.sub(r'\s+', ' ', s).strip()
+
+def _query_terms(s):
+    return set(_normalize_str(s).split())
+
+def _catalog_rows():
+    return query("SELECT id_producto, categoria, nombre FROM catalogo WHERE activo=1")
+
+def _find_product(all_p, id_producto):
+    for p in all_p:
+        if p['id_producto'] == id_producto:
+            return p
+    return None
+
+def _preferred_categories(qn):
+    words = set(qn.split())
+    cats = set()
+    if words & {'camara', 'cctv', 'nvr', 'solar', 'floodlight', 'lumios', 'lumi', 'bala'}:
+        cats.add('CCTV')
+    if words & {'deco', 'mesh', 'wifi', 'red', 'router'}:
+        cats.add('REDES')
+    if words & {'orvibo', 'mixpad', 'relay', 'interruptor', 'sensor', 'hub', 'toma', 'gfci', 'usb', 'tomacorriente'}:
+        cats.add('DOMOTICA')
+    if words & {'proyector', 'telon', 'parlante', 'amplificador', 'wiim'}:
+        cats.add('AUDIOVISUAL')
+    if words & {'cerradura', 'lock'}:
+        cats.add('CERRADURAS')
+    return cats
+
+def _alias_match(qn, all_p):
+    words = set(qn.split())
+    ordered_rules = [
+        ({'deco', 'pro'}, 'RED-001'),
+        ({'b3000'}, 'RED-001'),
+        ({'be3000'}, 'RED-001'),
+        ({'deco', 'm5'}, 'RED-002'),
+        ({'deco'}, 'RED-002'),
+        ({'interruptor', 'orvibo', 'defy', 'gris'}, 'DOM-024'),
+        ({'interruptor', 'orvibo', 'gris'}, 'DOM-001'),
+        ({'interruptor', 'orvibo', 'negro'}, 'DOM-002'),
+        ({'interruptor', 'orvibo', 'blanco'}, 'DOM-023'),
+        ({'mixpad', 'mini'}, 'DOM-003'),
+        ({'pantalla', 'mini', 'orvibo'}, 'DOM-003'),
+        ({'mixpad', 'grande'}, 'DOM-004'),
+        ({'pantalla', 'grande', 'orvibo'}, 'DOM-004'),
+        ({'relay', 'micro'}, 'DOM-009'),
+        ({'parlante', 'exterior'}, 'AV-006'),
+        ({'sensor', 'presencia'}, 'DOM-015'),
+        ({'camara', '360'}, 'CAM-001'),
+        ({'camara', 'bala', '4k'}, 'CAM-004'),
+        ({'lumios'}, 'CAM-005'),
+        ({'camara', 'exterior', '16mp'}, 'CAM-003'),
+        ({'camara', 'exterior', '180', 'solar'}, 'CAM-015'),
+        ({'solar', 'panoramica'}, 'CAM-015'),
+        ({'toma', 'usb'}, 'DOM-005'),
+        ({'tomacorriente', 'usb'}, 'DOM-005'),
+    ]
+    for required, pid in ordered_rules:
+        if required.issubset(words):
+            prod = _find_product(all_p, pid)
+            if prod:
+                return prod
+    return None
 
 def _match_catalog(codigo_query):
     qn = _normalize_str(codigo_query)
+    if not qn:
+        return {'found': False, 'ambiguous': []}
     # 1. exact code match
-    prod = query("SELECT id_producto, nombre FROM catalogo WHERE activo=1 AND UPPER(id_producto)=?",
+    prod = query("SELECT id_producto, categoria, nombre FROM catalogo WHERE activo=1 AND UPPER(id_producto)=?",
                  (qn.upper(),), one=True)
     if prod:
         return {'found': True, 'id_producto': prod['id_producto'], 'nombre': prod['nombre']}
-    all_p = query("SELECT id_producto, nombre FROM catalogo WHERE activo=1")
-    exact, substr = [], []
-    q_words = set(qn.split())
+    all_p = _catalog_rows()
+    aliased = _alias_match(qn, all_p)
+    if aliased:
+        return {'found': True, 'id_producto': aliased['id_producto'], 'nombre': aliased['nombre']}
+    exact, ranked = [], []
+    q_words = _query_terms(qn)
+    pref_cats = _preferred_categories(qn)
     for p in all_p:
         pn = _normalize_str(p['nombre'])
         if pn == qn:
             return {'found': True, 'id_producto': p['id_producto'], 'nombre': p['nombre']}
-        p_words = set(pn.split())
+        p_words = _query_terms(p['nombre'])
         if q_words and q_words.issubset(p_words):
             exact.append(p)
-        elif qn in pn or pn in qn or len(q_words & p_words) >= max(1, len(q_words) - 1):
-            substr.append(p)
-    candidates = exact or substr
+            continue
+        overlap = len(q_words & p_words)
+        if not overlap:
+            continue
+        score = overlap * 15
+        if qn in pn or pn in qn:
+            score += 35
+        if pref_cats and p['categoria'] in pref_cats:
+            score += 20
+        if overlap >= max(1, len(q_words) - 1):
+            score += 10
+        ranked.append((score, p))
+    candidates = exact
+    if not candidates and ranked:
+        ranked.sort(key=lambda x: (-x[0], x[1]['id_producto']))
+        best_score = ranked[0][0]
+        if best_score >= 20:
+            candidates = [p for score, p in ranked if score >= max(20, best_score - 10)][:5]
     if len(candidates) == 1:
         return {'found': True, 'id_producto': candidates[0]['id_producto'], 'nombre': candidates[0]['nombre']}
     elif candidates:
