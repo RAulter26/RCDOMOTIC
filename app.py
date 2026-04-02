@@ -2901,17 +2901,35 @@ def _normalize_str(s):
         ('orvivo', 'orvibo'),
         ('orbivo', 'orvibo'),
         ('orvbio', 'orvibo'),
+        ('decopro', 'deco pro'),
         ('decos', 'deco'),
         ('interruptores', 'interruptor'),
         ('grises', 'gris'),
         ('pantallas', 'pantalla'),
         ('grandes', 'grande'),
+        ('midpad', 'mixpad'),
+        ('mipad', 'mixpad'),
+        ('exteriores', 'exterior'),
+        ('interiores', 'interior'),
         ('parlantes', 'parlante'),
+        ('bocinas', 'bocina'),
+        ('techos', 'techo'),
         ('sensores', 'sensor'),
         ('camaras', 'camara'),
+        ('megapixeles', 'mp'),
+        ('megapixeleses', 'mp'),
+        ('megapixeles', 'mp'),
+        ('megapixel', 'mp'),
         ('tomacorrientes', 'tomacorriente'),
+        ('tomas', 'toma'),
         ('camarabala', 'camara bala'),
         ('lumion', 'lumios'),
+        ('queen', 'wiim'),
+        ('quinn', 'wiim'),
+        ('defi', 'defy'),
+        ('4k1', '4k'),
+        ('digitales', 'digital'),
+        ('cerraduras', 'cerradura'),
     ]
     for old, new in replacements:
         s = re.sub(rf'\b{old}\b', new, s)
@@ -2938,7 +2956,7 @@ def _preferred_categories(qn):
         cats.add('REDES')
     if words & {'orvibo', 'mixpad', 'relay', 'interruptor', 'sensor', 'hub', 'toma', 'gfci', 'usb', 'tomacorriente'}:
         cats.add('DOMOTICA')
-    if words & {'proyector', 'telon', 'parlante', 'amplificador', 'wiim'}:
+    if words & {'proyector', 'telon', 'parlante', 'bocina', 'techo', 'amplificador', 'wiim'}:
         cats.add('AUDIOVISUAL')
     if words & {'cerradura', 'lock'}:
         cats.add('CERRADURAS')
@@ -2952,7 +2970,11 @@ def _alias_match(qn, all_p):
         ({'be3000'}, 'RED-001'),
         ({'deco', 'm5'}, 'RED-002'),
         ({'deco'}, 'RED-002'),
+        ({'cerradura', 'v5'}, 'CEK-007'),
+        ({'v5'}, 'CEK-007'),
+        ({'cerradura', 'digital', 'huella'}, 'CEK-001'),
         ({'interruptor', 'orvibo', 'defy', 'gris'}, 'DOM-024'),
+        ({'interruptor', 'orvibo', 'defy'}, 'DOM-024'),
         ({'interruptor', 'orvibo', 'gris'}, 'DOM-001'),
         ({'interruptor', 'orvibo', 'negro'}, 'DOM-002'),
         ({'interruptor', 'orvibo', 'blanco'}, 'DOM-023'),
@@ -2962,10 +2984,15 @@ def _alias_match(qn, all_p):
         ({'pantalla', 'grande', 'orvibo'}, 'DOM-004'),
         ({'relay', 'micro'}, 'DOM-009'),
         ({'parlante', 'exterior'}, 'AV-006'),
+        ({'bocina', 'techo'}, 'AV-007'),
+        ({'parlante', 'techo'}, 'AV-007'),
+        ({'amplificador', 'wiim'}, 'AV-001'),
+        ({'wiim', 'ultra'}, 'AV-002'),
         ({'sensor', 'presencia'}, 'DOM-015'),
         ({'camara', '360'}, 'CAM-001'),
         ({'camara', 'bala', '4k'}, 'CAM-004'),
         ({'lumios'}, 'CAM-005'),
+        ({'camara', 'exterior', '16', 'mp'}, 'CAM-003'),
         ({'camara', 'exterior', '16mp'}, 'CAM-003'),
         ({'camara', 'exterior', '180', 'solar'}, 'CAM-015'),
         ({'solar', 'panoramica'}, 'CAM-015'),
