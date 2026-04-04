@@ -617,6 +617,19 @@ def init_db():
                      "SELECT 'PRINCIPAL', id_producto, COALESCE(stock_qty,0) FROM catalogo")
     except Exception:
         pass
+    try:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS bot_chat_context (
+                chat_id TEXT PRIMARY KEY,
+                cot_id INTEGER NOT NULL,
+                mode TEXT DEFAULT 'editar',
+                created_at TEXT DEFAULT '',
+                updated_at TEXT DEFAULT '',
+                FOREIGN KEY(cot_id) REFERENCES cotizaciones(id) ON DELETE CASCADE
+            )
+        """)
+    except Exception:
+        pass
     conn.commit()
     conn.close()
 
@@ -3237,12 +3250,114 @@ def _match_catalog(codigo_query):
         return {'found': False, 'ambiguous': [{'id_producto': p['id_producto'], 'nombre': p['nombre']} for p in candidates[:5]]}
     return {'found': False, 'ambiguous': []}
 
+def _bot_now_iso():
+    return datetime.datetime.now().isoformat(timespec='seconds')
+
+def _bot_ctx_get(chat_id):
+    chat_id = str(chat_id or '').strip()
+    if not chat_id:
+        return None
+    return query("SELECT * FROM bot_chat_context WHERE chat_id=?", (chat_id,), one=True)
+
+def _bot_ctx_set(chat_id, cot_id, mode='editar'):
+    chat_id = str(chat_id or '').strip()
+    if not chat_id or not cot_id:
+        return
+    ts = _bot_now_iso()
+    execute(
+        """INSERT INTO bot_chat_context (chat_id,cot_id,mode,created_at,updated_at)
+           VALUES (?,?,?,?,?)
+           ON CONFLICT(chat_id) DO UPDATE SET
+             cot_id=excluded.cot_id,
+             mode=excluded.mode,
+             updated_at=excluded.updated_at""",
+        (chat_id, cot_id, mode, ts, ts)
+    )
+
+def _bot_ctx_clear(chat_id):
+    chat_id = str(chat_id or '').strip()
+    if chat_id:
+        execute("DELETE FROM bot_chat_context WHERE chat_id=?", (chat_id,))
+
+def _bot_ctx_clear_by_cot(cot_id):
+    if cot_id:
+        execute("DELETE FROM bot_chat_context WHERE cot_id=?", (cot_id,))
+
+def _bot_qty_label(qty):
+    try:
+        qty_num = float(qty)
+        if qty_num.is_integer():
+            return str(int(qty_num))
+        return str(qty_num)
+    except Exception:
+        return str(qty)
+
+def _bot_add_or_merge_item(cot_id, codigo, cant, notas_item=''):
+    codigo = str(codigo or '').strip().upper()
+    cant = max(1, int(cant or 1))
+    notas_item = str(notas_item or '').strip()
+    existing = query("SELECT * FROM items WHERE cot_id=? AND id_producto=?", (cot_id, codigo), one=True)
+    if existing:
+        if notas_item and not str(existing.get('notas_item') or '').strip():
+            execute("UPDATE items SET cantidad=cantidad+?, notas_item=? WHERE id=?", (cant, notas_item, existing['id']))
+        else:
+            execute("UPDATE items SET cantidad=cantidad+? WHERE id=?", (cant, existing['id']))
+        return
+    ml = query("SELECT MAX(linea) as ml FROM items WHERE cot_id=?", (cot_id,), one=True)
+    execute(
+        "INSERT INTO items (cot_id,linea,id_producto,cantidad,precio_manual,inst_manual,cfg_manual,notas_item) VALUES (?,?,?,?,0,0,0,?)",
+        (cot_id, (ml['ml'] or 0) + 1, codigo, cant, notas_item)
+    )
+
+def _bot_build_quote_summary(cot_id, items_ambiguos=None, items_no_encontrados=None, intro=''):
+    cot = query("SELECT * FROM cotizaciones WHERE id=?", (cot_id,), one=True)
+    if not cot:
+        return ''
+    rows = query(
+        """SELECT i.id_producto, i.cantidad, c.nombre
+           FROM items i
+           LEFT JOIN catalogo c ON c.id_producto = i.id_producto
+           WHERE i.cot_id=?
+           ORDER BY i.linea, i.id""",
+        (cot_id,)
+    )
+    lines = [f"Borrador {cot['no_cotizacion']} - {cot.get('cliente') or 'Sin especificar'}"]
+    if intro:
+        lines.append(intro)
+    if cot.get('ciudad'):
+        lines.append(f"Ciudad: {cot['ciudad']}")
+    if cot.get('proyecto'):
+        lines.append(f"Proyecto: {cot['proyecto']}")
+    lines.append("")
+    for row in rows:
+        nombre = row.get('nombre') or row['id_producto']
+        lines.append(f"- {_bot_qty_label(row.get('cantidad'))}x {nombre} ({row['id_producto']})")
+    items_ambiguos = items_ambiguos or []
+    items_no_encontrados = items_no_encontrados or []
+    if items_ambiguos:
+        lines.append("")
+        lines.append("Ambiguos (elige abajo):")
+        for item in items_ambiguos:
+            lines.append(f"\"{item['query']}\" - varias opciones")
+    if items_no_encontrados:
+        lines.append("")
+        lines.append("No encontre: " + ', '.join(x['query'] for x in items_no_encontrados))
+    return '\n'.join(lines)
+
 @app.post('/api/bot/cotizacion')
 def bot_crear_cotizacion():
     err = _require_bot_key()
-    if err: return err
+    if err:
+        return err
     d = request.json or {}
+    chat_id = str(d.get('chat_id') or '').strip()
     cliente = (d.get('cliente') or 'Sin especificar').strip()
+    edit_ctx = _bot_ctx_get(chat_id)
+    edit_cot = None
+    if edit_ctx:
+        edit_cot = query("SELECT * FROM cotizaciones WHERE id=?", (edit_ctx['cot_id'],), one=True)
+        if not edit_cot:
+            _bot_ctx_clear(chat_id)
     items_ok, items_ambiguos, items_no_encontrados = [], [], []
     for it in (d.get('items') or []):
         codigo = str(it.get('codigo') or '').strip()
@@ -3250,64 +3365,154 @@ def bot_crear_cotizacion():
         notas_item = str(it.get('notas_item') or '').strip()
         m = _match_catalog(codigo)
         if m['found']:
-            items_ok.append({'id_producto': m['id_producto'], 'nombre': m['nombre'],
-                             'cantidad': cant, 'notas_item': notas_item})
+            items_ok.append({
+                'id_producto': m['id_producto'],
+                'nombre': m['nombre'],
+                'cantidad': cant,
+                'notas_item': notas_item,
+            })
         elif m['ambiguous']:
             items_ambiguos.append({'query': codigo, 'opciones': m['ambiguous']})
         else:
             items_no_encontrados.append({'query': codigo})
     if not items_ok and not items_ambiguos:
         faltan = ', '.join(x['query'] for x in items_no_encontrados)
-        return jsonify({'ok': False, 'error': 'No encontré ningún producto en el catálogo.',
-                        'items_no_encontrados': items_no_encontrados,
-                        'mensaje_telegram': f'No encontré ningún producto. ¿Quizás quisiste decir algo más? Productos no reconocidos: {faltan}'})
+        if edit_cot:
+            _bot_ctx_clear(chat_id)
+            return jsonify({
+                'ok': False,
+                'id': edit_cot['id'],
+                'error': 'No encontre ningun producto en el catalogo.',
+                'items_no_encontrados': items_no_encontrados,
+                'mensaje_telegram': (
+                    f"No pude actualizar el borrador {edit_cot['no_cotizacion']}. "
+                    f"No reconoci estos productos: {faltan}"
+                ),
+            })
+        return jsonify({
+            'ok': False,
+            'error': 'No encontre ningun producto en el catalogo.',
+            'items_no_encontrados': items_no_encontrados,
+            'mensaje_telegram': f'No encontre ningun producto. Productos no reconocidos: {faltan}',
+        })
+    if edit_cot:
+        for it in items_ok:
+            _bot_add_or_merge_item(edit_cot['id'], it['id_producto'], it['cantidad'], it['notas_item'])
+        _bot_ctx_clear(chat_id)
+        return jsonify({
+            'ok': True,
+            'id': edit_cot['id'],
+            'no_cotizacion': edit_cot['no_cotizacion'],
+            'resumen_texto': _bot_build_quote_summary(
+                edit_cot['id'],
+                items_ambiguos=items_ambiguos,
+                items_no_encontrados=items_no_encontrados,
+                intro='Actualice este borrador con tu cambio.',
+            ),
+            'items_ambiguos': items_ambiguos,
+            'items_no_encontrados': items_no_encontrados,
+        })
     no_cot = next_no_cotizacion()
     desc_pct = float(d.get('descuento_pct') or 0) / 100
     ant_pct = float(d.get('anticipo_pct') or 70) / 100
-    cot_id = execute("""INSERT INTO cotizaciones
+    cot_id = execute(
+        """INSERT INTO cotizaciones
         (no_cotizacion,cliente,telefono,ciudad,proyecto,tipo_cotizacion,forma_pago,
          anticipo_pct,descuento_pct,descuento_val,notas,vendedor,etapa,estado)
         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-        (no_cot, cliente, d.get('telefono',''), d.get('ciudad',''), d.get('proyecto',''),
-         'MIXTA', '70% - 30%', ant_pct, desc_pct, 0, d.get('notas',''), 'Bot', 'COTIZADA', 'BORRADOR'))
+        (
+            no_cot,
+            cliente,
+            d.get('telefono', ''),
+            d.get('ciudad', ''),
+            d.get('proyecto', ''),
+            'MIXTA',
+            '70% - 30%',
+            ant_pct,
+            desc_pct,
+            0,
+            d.get('notas', ''),
+            'Bot',
+            'COTIZADA',
+            'BORRADOR',
+        ),
+    )
     for idx, it in enumerate(items_ok, 1):
-        execute("INSERT INTO items (cot_id,linea,id_producto,cantidad,precio_manual,inst_manual,cfg_manual,notas_item) VALUES (?,?,?,?,0,0,0,?)",
-                (cot_id, idx, it['id_producto'], it['cantidad'], it['notas_item']))
-    lines = [f"*Borrador {no_cot}* — {cliente}"]
-    if d.get('ciudad'): lines.append(f"Ciudad: {d['ciudad']}")
-    if d.get('proyecto'): lines.append(f"Proyecto: {d['proyecto']}")
-    lines.append("")
+        execute(
+            "INSERT INTO items (cot_id,linea,id_producto,cantidad,precio_manual,inst_manual,cfg_manual,notas_item) VALUES (?,?,?,?,0,0,0,?)",
+            (cot_id, idx, it['id_producto'], it['cantidad'], it['notas_item']),
+        )
+    lines = [f"*Borrador {no_cot}* - {cliente}"]
+    if d.get('ciudad'):
+        lines.append(f"Ciudad: {d['ciudad']}")
+    if d.get('proyecto'):
+        lines.append(f"Proyecto: {d['proyecto']}")
+    lines.append('')
     for it in items_ok:
-        lines.append(f"• {it['cantidad']}x {it['nombre']} ({it['id_producto']})")
+        lines.append(f"- {it['cantidad']}x {it['nombre']} ({it['id_producto']})")
     if items_ambiguos:
-        lines.append("\n⚠️ Ambiguos (elige abajo):")
-        for a in items_ambiguos: lines.append(f'  "{a["query"]}" — varias opciones')
+        lines.append('')
+        lines.append('Ambiguos (elige abajo):')
+        for a in items_ambiguos:
+            lines.append(f'  "{a["query"]}" - varias opciones')
     if items_no_encontrados:
-        lines.append(f"\n❌ No encontré: {', '.join(x['query'] for x in items_no_encontrados)}")
-    return jsonify({'ok': True, 'id': cot_id, 'no_cotizacion': no_cot,
-                    'resumen_texto': '\n'.join(lines),
-                    'items_ambiguos': items_ambiguos,
-                    'items_no_encontrados': items_no_encontrados})
+        lines.append('')
+        lines.append('No encontre: ' + ', '.join(x['query'] for x in items_no_encontrados))
+    return jsonify({
+        'ok': True,
+        'id': cot_id,
+        'no_cotizacion': no_cot,
+        'resumen_texto': '\n'.join(lines),
+        'items_ambiguos': items_ambiguos,
+        'items_no_encontrados': items_no_encontrados,
+    })
 
 @app.post('/api/bot/cotizacion/accion')
 def bot_accion_cotizacion():
     err = _require_bot_key()
-    if err: return err
+    if err:
+        return err
     d = request.json or {}
     cot_id = d.get('id')
     accion = str(d.get('accion') or '').lower().strip()
+    chat_id = str(d.get('chat_id') or '').strip()
+    if accion == 'cambiar':
+        if not cot_id:
+            return jsonify({'ok': False, 'error': 'id requerido para cambiar algo.'})
+        cot = query("SELECT * FROM cotizaciones WHERE id=?", (cot_id,), one=True)
+        if not cot:
+            return jsonify({'ok': False, 'error': f'Cotizacion {cot_id} no encontrada.'})
+        if not chat_id:
+            return jsonify({'ok': False, 'error': 'chat_id requerido para cambiar algo.'})
+        _bot_ctx_set(chat_id, cot_id, 'editar')
+        return jsonify({
+            'ok': True,
+            'estado': cot.get('estado') or 'BORRADOR',
+            'modo': 'editar',
+            'mensaje_telegram': f"Perfecto. Enviame solo lo que quieres agregar o corregir y lo sumo al borrador {cot['no_cotizacion']}.",
+        })
     cot = query("SELECT * FROM cotizaciones WHERE id=?", (cot_id,), one=True)
     if not cot:
-        return jsonify({'ok': False, 'error': f'Cotización {cot_id} no encontrada.'})
+        return jsonify({'ok': False, 'error': f'Cotizacion {cot_id} no encontrada.'})
     if accion == 'confirmar':
+        _bot_ctx_clear(chat_id)
+        _bot_ctx_clear_by_cot(cot_id)
         execute("UPDATE cotizaciones SET estado='ENVIADA' WHERE id=?", (cot_id,))
-        return jsonify({'ok': True, 'estado': 'ENVIADA',
-                        'mensaje_telegram': f"✅ Cotización {cot['no_cotizacion']} confirmada y enviada a revisión."})
+        return jsonify({
+            'ok': True,
+            'estado': 'ENVIADA',
+            'mensaje_telegram': f"Cotizacion {cot['no_cotizacion']} confirmada y enviada a revision.",
+        })
     elif accion == 'cancelar':
+        _bot_ctx_clear(chat_id)
+        _bot_ctx_clear_by_cot(cot_id)
         execute("UPDATE cotizaciones SET estado='RECHAZADA' WHERE id=?", (cot_id,))
-        return jsonify({'ok': True, 'estado': 'RECHAZADA',
-                        'mensaje_telegram': f"❌ Cotización {cot['no_cotizacion']} cancelada."})
-    return jsonify({'ok': False, 'error': f'Acción desconocida: {accion}'})
+        return jsonify({
+            'ok': True,
+            'estado': 'RECHAZADA',
+            'mensaje_telegram': f"Cotizacion {cot['no_cotizacion']} cancelada.",
+        })
+    return jsonify({'ok': False, 'error': f'Accion desconocida: {accion}'})
 
 @app.post('/api/bot/cotizacion/<int:cot_id>/agregar_item')
 def bot_agregar_item(cot_id):
