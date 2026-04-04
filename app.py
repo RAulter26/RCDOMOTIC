@@ -3205,15 +3205,22 @@ def _alias_match(qn, all_p):
     return None
 
 def _match_catalog(codigo_query):
-    qn = _normalize_str(codigo_query)
-    if not qn:
+    raw_query = str(codigo_query or '').strip()
+    qn = _normalize_str(raw_query)
+    if not qn and not raw_query:
         return {'found': False, 'ambiguous': []}
     # 1. exact code match
     prod = query("SELECT id_producto, categoria, nombre FROM catalogo WHERE activo=1 AND UPPER(id_producto)=?",
-                 (qn.upper(),), one=True)
+                 (raw_query.upper(),), one=True)
     if prod:
         return {'found': True, 'id_producto': prod['id_producto'], 'nombre': prod['nombre']}
     all_p = _catalog_rows()
+    query_code_norm = re.sub(r'[^a-z0-9]+', '', (raw_query or qn).lower())
+    if query_code_norm:
+        for p in all_p:
+            prod_code_norm = re.sub(r'[^a-z0-9]+', '', str(p['id_producto']).lower())
+            if prod_code_norm == query_code_norm:
+                return {'found': True, 'id_producto': p['id_producto'], 'nombre': p['nombre']}
     aliased = _alias_match(qn, all_p)
     if aliased:
         return {'found': True, 'id_producto': aliased['id_producto'], 'nombre': aliased['nombre']}
@@ -3670,7 +3677,7 @@ def bot_accion_cotizacion():
     if err:
         return err
     d = request.json or {}
-    cot_id = d.get('id')
+    cot_id = d.get('id') or d.get('cot_id')
     accion = str(d.get('accion') or '').lower().strip()
     chat_id = str(d.get('chat_id') or '').strip()
     if accion == 'cambiar':
