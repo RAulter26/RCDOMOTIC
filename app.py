@@ -3110,6 +3110,7 @@ def _normalize_str(s):
         ('megapixel', 'mp'),
         ('tomacorrientes', 'tomacorriente'),
         ('tomas', 'toma'),
+        ('gfcs', 'gfci'),
         ('camarabala', 'camara bala'),
         ('lumion', 'lumios'),
         ('queen', 'wiim'),
@@ -3344,6 +3345,162 @@ def _bot_build_quote_summary(cot_id, items_ambiguos=None, items_no_encontrados=N
         lines.append("No encontre: " + ', '.join(x['query'] for x in items_no_encontrados))
     return '\n'.join(lines)
 
+BOT_QTY_WORDS = {
+    'un': 1, 'una': 1, 'uno': 1,
+    'dos': 2, 'tres': 3, 'cuatro': 4, 'cinco': 5,
+    'seis': 6, 'siete': 7, 'ocho': 8, 'nueve': 9, 'diez': 10,
+    'once': 11, 'doce': 12, 'trece': 13, 'catorce': 14, 'quince': 15,
+    'dieciseis': 16, 'diecisiete': 17, 'dieciocho': 18, 'diecinueve': 19, 'veinte': 20,
+}
+
+def _bot_extract_qty_and_phrase(raw_text):
+    text = _normalize_str(raw_text)
+    text = re.sub(r'\b(?:de|del|la|el|los|las|uds|unidad|unidades)\b', ' ', text)
+    text = re.sub(r'\s+', ' ', text).strip()
+    if not text:
+        return 1, ''
+    parts = text.split(' ', 1)
+    head = parts[0]
+    rest = parts[1] if len(parts) > 1 else ''
+    if head.isdigit():
+        return max(1, int(head)), rest.strip()
+    if head in BOT_QTY_WORDS:
+        return BOT_QTY_WORDS[head], rest.strip()
+    return 1, text
+
+def _bot_quote_items(cot_id):
+    return query(
+        """SELECT i.id, i.id_producto, i.cantidad, c.nombre, c.categoria
+           FROM items i
+           JOIN catalogo c ON c.id_producto = i.id_producto
+           WHERE i.cot_id=?
+           ORDER BY i.linea, i.id""",
+        (cot_id,)
+    )
+
+def _bot_match_existing_item(cot_id, query_text):
+    qn = _normalize_str(query_text)
+    if not qn:
+        return {'found': False, 'ambiguous': []}
+    rows = _bot_quote_items(cot_id)
+    exact = []
+    ranked = []
+    q_words = _query_terms(qn)
+    for row in rows:
+        name_norm = _normalize_str(row['nombre'])
+        code_norm = _normalize_str(row['id_producto'])
+        combined = f"{name_norm} {code_norm}".strip()
+        if qn == name_norm or qn == code_norm or qn == combined:
+            return {'found': True, 'id_producto': row['id_producto'], 'nombre': row['nombre']}
+        words = _query_terms(combined)
+        if q_words and q_words.issubset(words):
+            exact.append(row)
+            continue
+        overlap = len(q_words & words)
+        if not overlap:
+            continue
+        score = overlap * 20
+        if qn in combined or combined in qn:
+            score += 30
+        if overlap >= max(1, len(q_words) - 1):
+            score += 10
+        ranked.append((score, row))
+    candidates = exact
+    if not candidates and ranked:
+        ranked.sort(key=lambda x: (-x[0], x[1]['id_producto']))
+        best = ranked[0][0]
+        if best >= 20:
+            candidates = [row for score, row in ranked if score >= max(20, best - 10)][:5]
+    if len(candidates) == 1:
+        row = candidates[0]
+        return {'found': True, 'id_producto': row['id_producto'], 'nombre': row['nombre']}
+    if candidates:
+        return {'found': False, 'ambiguous': [{'id_producto': row['id_producto'], 'nombre': row['nombre']} for row in candidates]}
+    return {'found': False, 'ambiguous': []}
+
+def _bot_remove_or_reduce_item(cot_id, codigo, cant):
+    codigo = str(codigo or '').strip().upper()
+    remaining = max(1, int(cant or 1))
+    rows = query("SELECT id, cantidad FROM items WHERE cot_id=? AND id_producto=? ORDER BY linea, id", (cot_id, codigo))
+    changed = 0
+    for row in rows:
+        if remaining <= 0:
+            break
+        qty = int(row.get('cantidad') or 0)
+        if qty <= 0:
+            continue
+        if remaining >= qty:
+            execute("DELETE FROM items WHERE id=?", (row['id'],))
+            remaining -= qty
+            changed += qty
+        else:
+            execute("UPDATE items SET cantidad=? WHERE id=?", (qty - remaining, row['id']))
+            changed += remaining
+            remaining = 0
+    return changed
+
+def _bot_parse_edit_ops(cot_id, raw_text):
+    text = _normalize_str(raw_text)
+    if not text:
+        return {'handled': False}
+    ops = {
+        'handled': False,
+        'remove_ok': [],
+        'remove_ambiguos': [],
+        'remove_no_encontrados': [],
+        'add_ok': [],
+        'add_ambiguos': [],
+        'add_no_encontrados': [],
+    }
+
+    def resolve_remove(chunk):
+        qty, phrase = _bot_extract_qty_and_phrase(chunk)
+        match = _bot_match_existing_item(cot_id, phrase)
+        if match['found']:
+            ops['remove_ok'].append({'codigo': match['id_producto'], 'nombre': match['nombre'], 'cantidad': qty, 'query': phrase})
+        elif match['ambiguous']:
+            ops['remove_ambiguos'].append({'query': phrase, 'opciones': match['ambiguous']})
+        else:
+            ops['remove_no_encontrados'].append({'query': phrase})
+
+    def resolve_add(chunk):
+        qty, phrase = _bot_extract_qty_and_phrase(chunk)
+        match = _match_catalog(phrase)
+        if match['found']:
+            ops['add_ok'].append({'codigo': match['id_producto'], 'nombre': match['nombre'], 'cantidad': qty})
+        elif match['ambiguous']:
+            ops['add_ambiguos'].append({'query': phrase, 'opciones': match['ambiguous']})
+        else:
+            ops['add_no_encontrados'].append({'query': phrase})
+
+    replacement = re.search(r'(?:cambia|cambiar|reemplaza|reemplazar|sustituye|sustituir)\s+(.+?)\s+por\s+(.+)', text)
+    if replacement:
+        ops['handled'] = True
+        resolve_remove(replacement.group(1))
+        resolve_add(replacement.group(2))
+        return ops
+
+    remove_add = re.search(r'(?:quita|quitar|quite|borra|borrar|elimina|eliminar|saca|sacar)\s+(.+?)\s+(?:y\s+)?(?:pon|poner|agrega|agregar|anade|anadir|suma|sumar|mete|meter|deja|dejar|coloca|colocar)\s+(.+)', text)
+    if remove_add:
+        ops['handled'] = True
+        resolve_remove(remove_add.group(1))
+        resolve_add(remove_add.group(2))
+        return ops
+
+    remove_only = re.search(r'(?:quita|quitar|quite|borra|borrar|elimina|eliminar|saca|sacar)\s+(.+)', text)
+    if remove_only:
+        ops['handled'] = True
+        resolve_remove(remove_only.group(1))
+        return ops
+
+    add_only = re.search(r'(?:pon|poner|agrega|agregar|anade|anadir|suma|sumar|mete|meter|deja|dejar|coloca|colocar)\s+(.+)', text)
+    if add_only:
+        ops['handled'] = True
+        resolve_add(add_only.group(1))
+        return ops
+
+    return ops
+
 @app.post('/api/bot/cotizacion')
 def bot_crear_cotizacion():
     err = _require_bot_key()
@@ -3351,6 +3508,7 @@ def bot_crear_cotizacion():
         return err
     d = request.json or {}
     chat_id = str(d.get('chat_id') or '').strip()
+    raw_text = str(d.get('texto_original') or '').strip()
     cliente = (d.get('cliente') or 'Sin especificar').strip()
     edit_ctx = _bot_ctx_get(chat_id)
     edit_cot = None
@@ -3375,6 +3533,45 @@ def bot_crear_cotizacion():
             items_ambiguos.append({'query': codigo, 'opciones': m['ambiguous']})
         else:
             items_no_encontrados.append({'query': codigo})
+    if edit_cot:
+        edit_ops = _bot_parse_edit_ops(edit_cot['id'], raw_text)
+        if edit_ops.get('handled'):
+            changed = False
+            for it in edit_ops['remove_ok']:
+                changed = _bot_remove_or_reduce_item(edit_cot['id'], it['codigo'], it['cantidad']) > 0 or changed
+            for it in edit_ops['add_ok']:
+                _bot_add_or_merge_item(edit_cot['id'], it['codigo'], it['cantidad'])
+                changed = True
+            edit_ambiguos = edit_ops['remove_ambiguos'] + edit_ops['add_ambiguos']
+            edit_no_encontrados = edit_ops['remove_no_encontrados'] + edit_ops['add_no_encontrados']
+            if changed:
+                _bot_ctx_clear(chat_id)
+                return jsonify({
+                    'ok': True,
+                    'id': edit_cot['id'],
+                    'no_cotizacion': edit_cot['no_cotizacion'],
+                    'resumen_texto': _bot_build_quote_summary(
+                        edit_cot['id'],
+                        items_ambiguos=edit_ambiguos,
+                        items_no_encontrados=edit_no_encontrados,
+                        intro='Actualice este borrador con tu cambio.'
+                    ),
+                    'items_ambiguos': edit_ambiguos,
+                    'items_no_encontrados': edit_no_encontrados,
+                })
+            return jsonify({
+                'ok': False,
+                'id': edit_cot['id'],
+                'error': 'No pude aplicar ese cambio completo.',
+                'items_ambiguos': edit_ambiguos,
+                'items_no_encontrados': edit_no_encontrados,
+                'mensaje_telegram': _bot_build_quote_summary(
+                    edit_cot['id'],
+                    items_ambiguos=edit_ambiguos,
+                    items_no_encontrados=edit_no_encontrados,
+                    intro='No pude aplicar ese cambio completo. Pruebame con mas detalle.'
+                ),
+            })
     if not items_ok and not items_ambiguos:
         faltan = ', '.join(x['query'] for x in items_no_encontrados)
         if edit_cot:
