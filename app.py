@@ -31,10 +31,13 @@ except Exception:
     Limiter = None
     get_remote_address = None
 
+_DEFAULT_SECRET_KEY = 'rcdomotic-dev-secret'
+_DEFAULT_BOT_KEY = 'test-key-local-123'
+
 app = Flask(__name__)
 # Soporte de proxy (Render/NGINX): respeta X-Forwarded-Proto/Host
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
-app.secret_key = os.environ.get('SECRET_KEY', 'rcdomotic-dev-secret')
+app.secret_key = os.environ.get('SECRET_KEY', _DEFAULT_SECRET_KEY)
 
 # ─── Seguridad base ─────────────────────────────────────────────────────────
 IS_PROD = bool(os.environ.get('RENDER')) or (os.environ.get('FLASK_ENV','').lower() == 'production') or (os.environ.get('ENV','').lower() == 'production')
@@ -87,7 +90,19 @@ PUBLIC_API_WHITELIST = set(['/api/login', '/api/me'])
 
 CSRF_EXEMPT = set(['/api/login'])
 
-BOT_KEY = os.environ.get('BOT_KEY', 'test-key-local-123')
+if IS_PROD and app.secret_key == _DEFAULT_SECRET_KEY:
+    print('[SECURITY] WARNING: SECRET_KEY sigue con el valor por defecto en producción.')
+
+def _configured_bot_keys():
+    raw = (os.environ.get('BOT_KEY') or '').strip()
+    keys = {k.strip() for k in raw.split(',') if k.strip()}
+    if not keys and not IS_PROD:
+        keys.add(_DEFAULT_BOT_KEY)
+    return keys
+
+BOT_KEYS = _configured_bot_keys()
+if IS_PROD and not BOT_KEYS:
+    print('[SECURITY] WARNING: BOT_KEY no configurado en producción; /api/bot/* quedará deshabilitado.')
 
 def _csrf_token():
     tok = session.get('csrf_token')
@@ -1166,6 +1181,7 @@ def create_producto():
 
 # ─── INVENTARIO ─────────────────────────────────────────────────────────────
 @app.get('/api/inventario')
+@role_required('admin')
 def api_inventario():
     bodega = (request.args.get('bodega') or 'PRINCIPAL').upper()
     # aseguramos bodega
@@ -1183,6 +1199,7 @@ def api_inventario():
     return jsonify({'bodega': bodega, 'items': rows})
 
 @app.get('/api/inventario/movimientos')
+@role_required('admin')
 def api_inv_movs():
     bodega = (request.args.get('bodega') or 'PRINCIPAL').upper()
     rows = query("""SELECT m.*, c.nombre, c.categoria
@@ -1193,6 +1210,7 @@ def api_inv_movs():
     return jsonify({'bodega': bodega, 'movimientos': rows})
 
 @app.post('/api/inventario/movimiento')
+@role_required('admin')
 def api_inv_mov():
     d = request.json or {}
     bodega = (d.get('bodega') or 'PRINCIPAL').upper()
@@ -1248,11 +1266,13 @@ def api_inv_mov():
 
 # ─── PROVEEDORES ────────────────────────────────────────────────────────────
 @app.get('/api/proveedores')
+@role_required('admin')
 def api_proveedores_list():
     rows = query("SELECT * FROM proveedores ORDER BY nombre")
     return jsonify(rows)
 
 @app.post('/api/proveedores')
+@role_required('admin')
 def api_proveedores_create():
     d = request.json or {}
     if not (d.get('nombre') or '').strip():
@@ -1268,6 +1288,7 @@ def _gen_no_compra():
     return f"CP{y}-{int(n)+1:05d}"
 
 @app.get('/api/compras')
+@role_required('admin')
 def api_compras_list():
     rows = query("""SELECT co.*, p.nombre as proveedor
         FROM compras co LEFT JOIN proveedores p ON p.id=co.proveedor_id
@@ -1275,6 +1296,7 @@ def api_compras_list():
     return jsonify(rows)
 
 @app.post('/api/compras')
+@role_required('admin')
 def api_compras_create():
     d = request.json or {}
     items = d.get('items') or []
@@ -1739,6 +1761,7 @@ def delete_item(item_id):
     execute("DELETE FROM items WHERE id=?", (item_id,)); return jsonify({'ok': True})
 
 @app.get('/api/parametros')
+@role_required('admin')
 def get_parametros():
     return jsonify({r['clave']: r['valor'] for r in query("SELECT * FROM parametros")})
 
@@ -1752,6 +1775,7 @@ def update_parametros():
 
 # ─── Listas de precios (perfil) ────────────────────────────────────────────
 @app.get('/api/price_lists')
+@role_required('admin')
 def api_price_lists():
     rows = query("SELECT * FROM price_lists WHERE active=1 ORDER BY desc_pct, code")
     return jsonify(rows)
@@ -1882,6 +1906,7 @@ def cot_share(cot_id):
 
 # ─── DASHBOARD STATS (solo APROBADA para ventas) ────────────────────────────
 @app.get('/api/stats')
+@role_required('admin')
 def get_stats():
     total_cots = query("SELECT COUNT(*) as n FROM cotizaciones", one=True)['n']
     por_estado = query("SELECT estado, COUNT(*) as n FROM cotizaciones GROUP BY estado")
@@ -1893,6 +1918,7 @@ def get_stats():
                     'top_productos': [dict(r) for r in top_prods]})
 
 @app.get('/api/stats/dashboard')
+@role_required('admin')
 def get_dashboard():
     """Dashboard avanzado: ventas SOLO de cotizaciones APROBADA."""
     now = datetime.date.today()
@@ -1971,6 +1997,7 @@ def get_dashboard():
 
 
 @app.get('/api/stats/series')
+@role_required('admin')
 def get_stats_series():
     """Series para el gráfico de Ventas.
 
@@ -2054,6 +2081,7 @@ def get_stats_series():
 
 
 @app.get('/api/stats/bi')
+@role_required('admin')
 def get_stats_bi():
     """BI para Inicio (estilo dashboard).
 
@@ -2184,6 +2212,7 @@ def get_stats_bi():
     })
 
 @app.get('/api/stats/ops')
+@role_required('admin')
 def get_stats_ops():
     """Dashboard operacional: pipeline, alertas, meta, actividad reciente."""
     try:
@@ -2355,6 +2384,7 @@ def cmd_create_quote():
 
 # ─── EXCEL EXPORT (CON TRY/EXCEPT ROBUSTO) ──────────────────────────────────
 @app.get('/export/excel/<int:cot_id>')
+@login_required
 def export_excel(cot_id):
     try:
         from openpyxl import Workbook
@@ -2607,6 +2637,7 @@ PRINT_TEMPLATE = """<!DOCTYPE html>
 </div></body></html>"""
 
 @app.get('/print/<int:cot_id>')
+@login_required
 def print_cotizacion(cot_id):
     cot = query("SELECT * FROM cotizaciones WHERE id=?", (cot_id,), one=True)
     if not cot: return "Not found", 404
@@ -3019,6 +3050,7 @@ def serve_index():
 
 
 @app.get('/print/inventario')
+@role_required('admin')
 def print_inventario():
     bodega = (request.args.get('bodega') or 'PRINCIPAL').upper()
     data = api_inventario().json
@@ -3073,8 +3105,10 @@ def print_inventario():
 # ─── BOT API (Telegram Cotizador) ────────────────────────────────────────────
 
 def _require_bot_key():
+    if not BOT_KEYS:
+        return jsonify({'ok': False, 'error': 'BOT_KEY no configurado en el servidor.'}), 503
     k = request.headers.get('X-Bot-Key') or request.headers.get('x-bot-key') or ''
-    if not k or k != BOT_KEY:
+    if not k or k not in BOT_KEYS:
         return jsonify({'ok': False, 'error': 'Unauthorized'}), 401
     return None
 
