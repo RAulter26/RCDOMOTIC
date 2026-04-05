@@ -10,7 +10,10 @@ __pycache__/
 
 # Business data and generated artifacts
 rc_domotic.db
-uploads/
+# Mantener uploads de productos en repo (catálogo visual en producción)
+uploads/*
+!uploads/products/
+!uploads/products/**
 backups/
 exports/
 tmp/

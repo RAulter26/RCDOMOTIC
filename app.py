@@ -645,6 +645,8 @@ def init_db():
         """)
     except Exception:
         pass
+    # Si hay archivos locales en uploads/products, asegura imagen_url en catalogo.
+    _sync_catalog_images_from_uploads(conn)
     conn.commit()
     conn.close()
 
@@ -874,6 +876,57 @@ def calcular_margenes(cot_id):
 # ─── IMÁGENES ────────────────────────────────────────────────────────────────
 def allowed_file(fn):
     return '.' in fn and fn.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def _sync_catalog_images_from_uploads(conn):
+    """
+    Sincroniza imagen_url en catalogo usando archivos locales en uploads/products.
+    Regla de nombre esperada: <ID_PRODUCTO>_*.jpg|png|webp...
+    """
+    try:
+        if not os.path.isdir(UPLOAD_FOLDER):
+            return
+        mapping = {}
+        for fn in sorted(os.listdir(UPLOAD_FOLDER)):
+            fpath = os.path.join(UPLOAD_FOLDER, fn)
+            if not os.path.isfile(fpath):
+                continue
+            low = fn.lower()
+            if not low.endswith(('.png', '.jpg', '.jpeg', '.webp', '.gif', '.bmp', '.svg')):
+                continue
+            m = re.match(r'^([A-Za-z]{2,5}-\d{3})_', fn)
+            if not m:
+                continue
+            pid = m.group(1).upper()
+            if pid not in mapping:
+                mapping[pid] = fn
+        if not mapping:
+            return
+
+        rows = conn.execute("SELECT id_producto, imagen_url FROM catalogo").fetchall()
+        updates = 0
+        for row in rows:
+            pid = str(row[0] or '').upper()
+            cur = str(row[1] or '').strip()
+            fallback_fn = mapping.get(pid)
+            if not fallback_fn:
+                continue
+            fallback_url = f"/uploads/products/{fallback_fn}"
+            must_update = False
+            if (not cur) or (cur.upper() == 'SIN_IMG'):
+                must_update = True
+            elif cur.startswith('/uploads/products/'):
+                cur_fn = cur.split('/uploads/products/', 1)[1]
+                cur_path = os.path.join(UPLOAD_FOLDER, cur_fn)
+                if not os.path.isfile(cur_path):
+                    must_update = True
+            if must_update:
+                conn.execute("UPDATE catalogo SET imagen_url=? WHERE id_producto=?", (fallback_url, pid))
+                updates += 1
+        if updates:
+            conn.commit()
+            print(f"✓ Imagenes sincronizadas desde uploads/products: {updates}")
+    except Exception as e:
+        print("[WARN] No se pudo sincronizar imagenes de catalogo:", e)
 
 @app.route('/uploads/products/<path:filename>')
 def serve_upload(filename):
