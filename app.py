@@ -3542,6 +3542,16 @@ def _bot_parse_edit_ops(cot_id, raw_text):
 
     return ops
 
+def _bot_has_remove_intent(raw_text):
+    text = _normalize_str(raw_text)
+    if not text:
+        return False
+    return bool(re.search(
+        r'\b(quita|quitar|quite|borra|borrar|elimina|eliminar|saca|sacar|'
+        r'cambia|cambiar|reemplaza|reemplazar|sustituye|sustituir)\b',
+        text
+    ))
+
 @app.post('/api/bot/cotizacion')
 def bot_crear_cotizacion():
     err = _require_bot_key()
@@ -3550,6 +3560,7 @@ def bot_crear_cotizacion():
     d = request.json or {}
     chat_id = str(d.get('chat_id') or '').strip()
     raw_text = str(d.get('texto_original') or '').strip()
+    has_remove_intent = _bot_has_remove_intent(raw_text)
     cliente = (d.get('cliente') or 'Sin especificar').strip()
     edit_ctx = _bot_ctx_get(chat_id)
     edit_cot = None
@@ -3577,14 +3588,32 @@ def bot_crear_cotizacion():
     if edit_cot:
         edit_ops = _bot_parse_edit_ops(edit_cot['id'], raw_text)
         if edit_ops.get('handled'):
+            edit_ambiguos = edit_ops['remove_ambiguos'] + edit_ops['add_ambiguos']
+            edit_no_encontrados = edit_ops['remove_no_encontrados'] + edit_ops['add_no_encontrados']
+
+            # Regla anti-duplicados: si el usuario pidio quitar/reemplazar, no agregamos nada
+            # hasta poder identificar claramente el producto a retirar del mismo borrador.
+            if has_remove_intent and not edit_ops['remove_ok']:
+                return jsonify({
+                    'ok': False,
+                    'id': edit_cot['id'],
+                    'error': 'No identifique con precision que producto quitar.',
+                    'items_ambiguos': edit_ambiguos,
+                    'items_no_encontrados': edit_no_encontrados,
+                    'mensaje_telegram': _bot_build_quote_summary(
+                        edit_cot['id'],
+                        items_ambiguos=edit_ambiguos,
+                        items_no_encontrados=edit_no_encontrados,
+                        intro='No aplique cambios para evitar duplicados. Dime exactamente que producto debo quitar.'
+                    ),
+                })
+
             changed = False
             for it in edit_ops['remove_ok']:
                 changed = _bot_remove_or_reduce_item(edit_cot['id'], it['codigo'], it['cantidad']) > 0 or changed
             for it in edit_ops['add_ok']:
                 _bot_add_or_merge_item(edit_cot['id'], it['codigo'], it['cantidad'])
                 changed = True
-            edit_ambiguos = edit_ops['remove_ambiguos'] + edit_ops['add_ambiguos']
-            edit_no_encontrados = edit_ops['remove_no_encontrados'] + edit_ops['add_no_encontrados']
             if changed:
                 _bot_ctx_clear(chat_id)
                 return jsonify({
@@ -3616,7 +3645,6 @@ def bot_crear_cotizacion():
     if not items_ok and not items_ambiguos:
         faltan = ', '.join(x['query'] for x in items_no_encontrados)
         if edit_cot:
-            _bot_ctx_clear(chat_id)
             return jsonify({
                 'ok': False,
                 'id': edit_cot['id'],
@@ -3634,6 +3662,20 @@ def bot_crear_cotizacion():
             'mensaje_telegram': f'No encontre ningun producto. Productos no reconocidos: {faltan}',
         })
     if edit_cot:
+        if has_remove_intent:
+            return jsonify({
+                'ok': False,
+                'id': edit_cot['id'],
+                'error': 'No pude aplicar la parte de quitar/reemplazar con ese texto.',
+                'items_ambiguos': items_ambiguos,
+                'items_no_encontrados': items_no_encontrados,
+                'mensaje_telegram': _bot_build_quote_summary(
+                    edit_cot['id'],
+                    items_ambiguos=items_ambiguos,
+                    items_no_encontrados=items_no_encontrados,
+                    intro='No aplique cambios para evitar duplicados. Dime exactamente que producto debo quitar y cual agregar.'
+                ),
+            })
         for it in items_ok:
             _bot_add_or_merge_item(edit_cot['id'], it['id_producto'], it['cantidad'], it['notas_item'])
         _bot_ctx_clear(chat_id)
