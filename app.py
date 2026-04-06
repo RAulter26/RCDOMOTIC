@@ -1,7 +1,7 @@
-"""# RC DOMOTIC - Cotizador App v3.0
+﻿"""# RC DOMOTIC - Cotizador App v3.0
 Flask + SQLite3 | Sin dependencias de nube | Funciona en local o servidor
-v3: Fix Excel, Selector categorías, Merge duplicados, Logo+Watermark PDF,
-    Dashboard APROBADA, Catálogo Pro, Comandos seguros
+v3: Fix Excel, Selector categorÃ­as, Merge duplicados, Logo+Watermark PDF,
+    Dashboard APROBADA, CatÃ¡logo Pro, Comandos seguros
 """
 import sqlite3, os, json, datetime, re, uuid, traceback, secrets, time, ipaddress, socket, unicodedata
 from functools import wraps
@@ -14,7 +14,7 @@ from io import BytesIO
 from PIL import Image
 import urllib.request
 import urllib.parse
-# ─── Seguridad opcional (si están instaladas) ───────────────────────────────
+# â”€â”€â”€ Seguridad opcional (si estÃ¡n instaladas) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 try:
     from argon2 import PasswordHasher
     from argon2.exceptions import VerifyMismatchError
@@ -39,16 +39,16 @@ app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 app.secret_key = os.environ.get('SECRET_KEY', _DEFAULT_SECRET_KEY)
 
-# ─── Seguridad base ─────────────────────────────────────────────────────────
+# â”€â”€â”€ Seguridad base â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 IS_PROD = bool(os.environ.get('RENDER')) or (os.environ.get('FLASK_ENV','').lower() == 'production') or (os.environ.get('ENV','').lower() == 'production')
-# Cookies de sesión
+# Cookies de sesiÃ³n
 app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE='Lax',
     SESSION_COOKIE_SECURE=IS_PROD,  # en Render normalmente es HTTPS
     PERMANENT_SESSION_LIFETIME=datetime.timedelta(hours=10),
 )
-# Límite de carga (uploads)
+# LÃ­mite de carga (uploads)
 app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH  = os.path.join(BASE_DIR, 'rc_domotic.db')
@@ -56,14 +56,14 @@ UPLOAD_FOLDER     = os.path.join(BASE_DIR, 'uploads', 'products')
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp'}
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-# Rate limiting (si flask-limiter está disponible)
+# Rate limiting (si flask-limiter estÃ¡ disponible)
 limiter = None
 if Limiter and get_remote_address:
     limiter = Limiter(get_remote_address, app=app,
                       default_limits=["200 per hour", "60 per minute"],
                       storage_uri=os.environ.get("LIMITER_STORAGE_URI") or "memory://")
 def limit(rule: str):
-    """Decorator de rate-limit que no rompe si flask-limiter no está instalado."""
+    """Decorator de rate-limit que no rompe si flask-limiter no estÃ¡ instalado."""
     def deco(fn):
         if limiter:
             return limiter.limit(rule)(fn)
@@ -85,13 +85,13 @@ def _set_security_headers(resp):
         pass
     return resp
 
-# ─── Auth helpers (roles: admin | vendedor | lector) ───────────────────────
+# â”€â”€â”€ Auth helpers (roles: admin | vendedor | lector) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 PUBLIC_API_WHITELIST = set(['/api/login', '/api/me'])
 
 CSRF_EXEMPT = set(['/api/login'])
 
 if IS_PROD and app.secret_key == _DEFAULT_SECRET_KEY:
-    print('[SECURITY] WARNING: SECRET_KEY sigue con el valor por defecto en producción.')
+    print('[SECURITY] WARNING: SECRET_KEY sigue con el valor por defecto en producciÃ³n.')
 
 def _configured_bot_keys():
     raw = (os.environ.get('BOT_KEY') or '').strip()
@@ -102,7 +102,7 @@ def _configured_bot_keys():
 
 BOT_KEYS = _configured_bot_keys()
 if IS_PROD and not BOT_KEYS:
-    print('[SECURITY] WARNING: BOT_KEY no configurado en producción; /api/bot/* quedará deshabilitado.')
+    print('[SECURITY] WARNING: BOT_KEY no configurado en producciÃ³n; /api/bot/* quedarÃ¡ deshabilitado.')
 
 def _csrf_token():
     tok = session.get('csrf_token')
@@ -159,11 +159,11 @@ def role_required(*roles):
         return _wrap
     return deco
 
-# ─── Imagen utils (fondo transparente simple: blanco -> alpha) ───────────────
+# â”€â”€â”€ Imagen utils (fondo transparente simple: blanco -> alpha) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 def _remove_white_bg_to_png(src_path: str, dst_path: str, thr: int = 245):
     """Convierte fondo blanco/casi blanco a transparente.
 
-    Nota: no usa IA; es un método práctico para fotos sobre fondo blanco.
+    Nota: no usa IA; es un mÃ©todo prÃ¡ctico para fotos sobre fondo blanco.
     """
     im = Image.open(src_path).convert('RGBA')
     px = im.getdata()
@@ -176,7 +176,7 @@ def _remove_white_bg_to_png(src_path: str, dst_path: str, thr: int = 245):
     im.putdata(new)
     im.save(dst_path, format='PNG', optimize=True)
 
-# ─── Arranque seguro (Render/Gunicorn/Flask run) ─────────────────────────────
+# â”€â”€â”€ Arranque seguro (Render/Gunicorn/Flask run) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # La BD antes se inicializaba solo en "python app.py" (bloque __main__).
 # En servidores (gunicorn / flask run) eso no se ejecuta y el frontend se queda
 # sin datos (y el JS se cae al intentar parsear HTML como JSON).
@@ -189,10 +189,10 @@ def ensure_db_ready():
         init_db()
         _DB_INIT_DONE = True
     except Exception as e:
-        # No tumbar el proceso; las rutas devolverán error controlado.
+        # No tumbar el proceso; las rutas devolverÃ¡n error controlado.
         print("[WARN] No se pudo inicializar la BD:", e)
 
-# ─── DB helpers ───────────────────────────────────────────────────────────────
+# â”€â”€â”€ DB helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 def get_db():
     ensure_db_ready()
     if 'db' not in g:
@@ -220,7 +220,7 @@ def execute(sql, params=()):
 
 @app.before_request
 def _enforce_auth_for_api():
-    """Protege /api/* con sesión y valida CSRF en métodos de escritura.
+    """Protege /api/* con sesiÃ³n y valida CSRF en mÃ©todos de escritura.
     Se dejan abiertos /api/login y /api/me (para bootstrap/login).
     """
     p = request.path or ''
@@ -228,10 +228,10 @@ def _enforce_auth_for_api():
         return
     if p in PUBLIC_API_WHITELIST:
         return
-    # endpoints públicos por token (si en el futuro se crean en /api/public/...)
+    # endpoints pÃºblicos por token (si en el futuro se crean en /api/public/...)
     if p.startswith('/api/public/'):
         return
-    # bot endpoints se autentican con X-Bot-Key, no con sesión
+    # bot endpoints se autentican con X-Bot-Key, no con sesiÃ³n
     if p.startswith('/api/bot/'):
         return
 
@@ -243,10 +243,10 @@ def _enforce_auth_for_api():
         sent = request.headers.get('X-CSRFToken') or request.headers.get('X-CSRF-Token') or ''
         tok = session.get('csrf_token') or ''
         if not tok or not sent or sent != tok:
-            return jsonify({'ok': False, 'error': 'CSRF inválido. Recarga e intenta de nuevo.'}), 403
+            return jsonify({'ok': False, 'error': 'CSRF invÃ¡lido. Recarga e intenta de nuevo.'}), 403
 
 
-# ─── DB INIT (SEGURO — nunca DROP) ──────────────────────────────────────────
+# â”€â”€â”€ DB INIT (SEGURO â€” nunca DROP) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 SCHEMA = """
 PRAGMA foreign_keys = ON;
 
@@ -440,43 +440,43 @@ PRODUCTOS = [
     ('DOM-003','DOMOTICA','Pantalla Mixpad Mini','Orvibo Mixpad mini WiFi BT ZB Alexa 2 circuitos','Und',980000,0,0,0,200000,'',1),
     ('DOM-004','DOMOTICA','Pantalla Mixpad Grande','Orvibo Mixpad WiFi BT pantalla grande Alexa','Und',3250000,0,0,0,400000,'',1),
     ('DOM-005','DOMOTICA','Toma USB Tipo C','Toma corriente con puerto USB A y tipo C','Und',75000,0,0,90000,0,'',1),
-    ('DOM-006','DOMOTICA','Toma GFCI Gris','Toma corriente GFCI protección diferencial','Und',85000,0,0,90000,0,'',1),
+    ('DOM-006','DOMOTICA','Toma GFCI Gris','Toma corriente GFCI protecciÃ³n diferencial','Und',85000,0,0,90000,0,'',1),
     ('DOM-007','DOMOTICA','Toma GFCI Negro','Toma corriente GFCI negra','Und',105000,0,0,90000,0,'',1),
     ('DOM-008','DOMOTICA','Toma Naranja','Toma corriente naranja','Und',65000,0,0,90000,0,'',1),
     ('DOM-009','DOMOTICA','Relay Micro Orvibo','Micro relay multifuncional cortinas contacto seco','Und',345000,0,0,0,0,'',1),
     ('DOM-010','DOMOTICA','Control TV Magic Dot','WiFi Remote Control Magic Dot 5V IR/RF','Und',85000,0,0,0,0,'',1),
     ('DOM-011','DOMOTICA','Hub Control Orvibo','Hub central del sistema Orvibo','Und',380000,0,0,0,150000,'',1),
-    ('DOM-012','DOMOTICA','Enchufe Inalámbrico','Cargador inalámbrico 15W 4 salidas CA USB A/C 20W','Und',450000,0,0,0,0,'',1),
+    ('DOM-012','DOMOTICA','Enchufe InalÃ¡mbrico','Cargador inalÃ¡mbrico 15W 4 salidas CA USB A/C 20W','Und',450000,0,0,0,0,'',1),
     ('DOM-013','DOMOTICA','Control Universal Pro','IR y RF Control remoto universal todo en uno Hub','Und',420000,0,0,0,0,'',1),
     ('DOM-014','DOMOTICA','Dimmer WiFi D1','US Dimmer WiFi Switch D1','Und',380000,0,0,80000,0,'',1),
-    ('DOM-015','DOMOTICA','Sensor Presencia Orvibo','Orvibo sensor detección de presencia humana','Und',290000,0,0,0,0,'',1),
+    ('DOM-015','DOMOTICA','Sensor Presencia Orvibo','Orvibo sensor detecciÃ³n de presencia humana','Und',290000,0,0,0,0,'',1),
     ('DOM-016','DOMOTICA','Controlador Cortinas RM4','Hub RM4pro para control de cortinas WiFi','Und',220000,0,0,80000,0,'',1),
     ('DOM-017','DOMOTICA','Alexa Echo Spot','Amazon Alexa Echo Spot con pantalla 5"','Und',340000,0,0,0,0,'',1),
-    ('DOM-018','DOMOTICA','Batería Echo Spot','Base batería 5000mAh para Alexa Echo Spot','Und',210000,0,0,0,0,'',1),
-    ('DOM-019','DOMOTICA','Cargador Baterías AA/AAA','Cargador USB alta velocidad AA/AAA','Und',75000,0,0,0,0,'',1),
-    ('DOM-020','DOMOTICA','Baterías Litio Recargable','Paquete baterías litio recargables AA/AAA','Und',170000,0,0,0,0,'',1),
+    ('DOM-018','DOMOTICA','BaterÃ­a Echo Spot','Base baterÃ­a 5000mAh para Alexa Echo Spot','Und',210000,0,0,0,0,'',1),
+    ('DOM-019','DOMOTICA','Cargador BaterÃ­as AA/AAA','Cargador USB alta velocidad AA/AAA','Und',75000,0,0,0,0,'',1),
+    ('DOM-020','DOMOTICA','BaterÃ­as Litio Recargable','Paquete baterÃ­as litio recargables AA/AAA','Und',170000,0,0,0,0,'',1),
     ('CEK-001','CERRADURAS','Cerradura Digital Huella','Cerradura con huella digital y llaves','Und',250000,0,0,80000,0,'',1),
     ('CEK-002','CERRADURAS','Cerradura C220','Cerradura digital C220 app inteligente','Und',945000,0,0,80000,0,'',1),
-    ('CEK-003','CERRADURAS','Cerradura Gerencia Venas','Cerradura reconocimiento de venas biométrico','Und',1050000,0,0,80000,0,'',1),
-    ('CEK-004','CERRADURAS','Botón Salida No Touch','Botón de salida sin contacto','Und',120000,0,0,50000,0,'',1),
-    ('CEK-005','CERRADURAS','Terminal Reconocimiento Facial','Terminal biométrica facial acceso','Und',650000,0,0,100000,0,'',1),
+    ('CEK-003','CERRADURAS','Cerradura Gerencia Venas','Cerradura reconocimiento de venas biomÃ©trico','Und',1050000,0,0,80000,0,'',1),
+    ('CEK-004','CERRADURAS','BotÃ³n Salida No Touch','BotÃ³n de salida sin contacto','Und',120000,0,0,50000,0,'',1),
+    ('CEK-005','CERRADURAS','Terminal Reconocimiento Facial','Terminal biomÃ©trica facial acceso','Und',650000,0,0,100000,0,'',1),
     ('CEK-006','CERRADURAS','Video Portero','Sistema de Video Portero IP completo','Servicio',4562930,0,0,150000,0,'',1),
-    ('CAM-001','CCTV','Cámara 360 Interior 2K','Cámara inalámbrica 360° 2K+6MP 2.4/5GHz interior','Und',880000,0,0,100000,0,'',1),
-    ('CAM-002','CCTV','Cámara 360 Ojo de Pez','Cámara 360 ojo de pez WiFi interior','Und',660000,0,0,100000,0,'',1),
-    ('CAM-003','CCTV','Cámara Exterior 16MP','Cámara WiFi 16MP ultra gran angular 180° Duo','Und',1250000,0,0,100000,0,'',1),
-    ('CAM-004','CCTV','Cámara Bala 4K WiFi 6','Cámara exterior bala 4K WiFi 6 IP66','Und',380000,0,0,100000,0,'',1),
-    ('CAM-005','CCTV','Cámara Lumios 2K WiFi 6','Cámara Lumios 1080P exterior foco WiFi','Und',280000,0,0,100000,0,'',1),
-    ('CAM-006','CCTV','NVR 8 Canales WiFi','Sistema NVR grabación cámaras WiFi 8 canales','Und',1400000,0,0,0,200000,'',1),
+    ('CAM-001','CCTV','CÃ¡mara 360 Interior 2K','CÃ¡mara inalÃ¡mbrica 360Â° 2K+6MP 2.4/5GHz interior','Und',880000,0,0,100000,0,'',1),
+    ('CAM-002','CCTV','CÃ¡mara 360 Ojo de Pez','CÃ¡mara 360 ojo de pez WiFi interior','Und',660000,0,0,100000,0,'',1),
+    ('CAM-003','CCTV','CÃ¡mara Exterior 16MP','CÃ¡mara WiFi 16MP ultra gran angular 180Â° Duo','Und',1250000,0,0,100000,0,'',1),
+    ('CAM-004','CCTV','CÃ¡mara Bala 4K WiFi 6','CÃ¡mara exterior bala 4K WiFi 6 IP66','Und',380000,0,0,100000,0,'',1),
+    ('CAM-005','CCTV','CÃ¡mara Lumios 2K WiFi 6','CÃ¡mara Lumios 1080P exterior foco WiFi','Und',280000,0,0,100000,0,'',1),
+    ('CAM-006','CCTV','NVR 8 Canales WiFi','Sistema NVR grabaciÃ³n cÃ¡maras WiFi 8 canales','Und',1400000,0,0,0,200000,'',1),
     ('CAM-007','CCTV','NVR 12 Canales WiFi 6 2TB','Reolink NVR 12CH WiFi 6 disco 2TB 24/7','Und',1450000,0,0,0,200000,'',1),
-    ('CAM-008','CCTV','Cámara Web 4K OBSBOT','OBSBOT Tiny 2 Lite cámara web 4K AI tracking','Und',889000,0,0,0,0,'',1),
+    ('CAM-008','CCTV','CÃ¡mara Web 4K OBSBOT','OBSBOT Tiny 2 Lite cÃ¡mara web 4K AI tracking','Und',889000,0,0,0,0,'',1),
     ('RED-001','REDES','Deco BE3000 WiFi 7 Interior','TP-Link Deco BE3000 WiFi 7 unidad interior','Und',860000,0,0,50000,100000,'',1),
     ('RED-002','REDES','Deco x55 WiFi 7 M5','Deco x55 WiFi 7 M5 interior alta velocidad','Und',425000,0,0,50000,100000,'',1),
     ('RED-003','REDES','Deco WiFi 6 Doble Banda','Unidad extensora WiFi 6 doble banda mesh','Und',290000,0,0,50000,100000,'',1),
     ('RED-004','REDES','Switch Internet','Switch de red ethernet 8 puertos','Und',140000,0,0,50000,0,'',1),
     ('RED-005','REDES','Soporte Pared Deco Interior','Soporte pared para Decos internet interior','Und',180000,0,0,0,0,'',1),
-    ('RED-006','REDES','Soporte Deco Interior (small)','Soporte pequeño para Decos internet interior','Und',75000,0,0,0,0,'',1),
+    ('RED-006','REDES','Soporte Deco Interior (small)','Soporte pequeÃ±o para Decos internet interior','Und',75000,0,0,0,0,'',1),
     ('RED-007','REDES','Extensor Red Internet','Extensor de red internet WiFi','Und',75000,0,0,50000,0,'',1),
-    ('AV-001','AUDIOVISUAL','Amplificador WiiM','WiiM Amp multihabitación AirPlay Alexa','Und',2550000,0,0,0,150000,'',1),
+    ('AV-001','AUDIOVISUAL','Amplificador WiiM','WiiM Amp multihabitaciÃ³n AirPlay Alexa','Und',2550000,0,0,0,150000,'',1),
     ('AV-002','AUDIOVISUAL','Amplificador WiiM Amp Ultra','WiiM Amp Ultra 100W voz AirPlay Spotify','Und',3150000,0,0,0,200000,'',1),
     ('AV-003','AUDIOVISUAL','Parlante Klipsch Empotrado','Parlante empotrado techo Klipsch 5.25"','Und',770000,0,0,150000,0,'',1),
     ('AV-004','AUDIOVISUAL','Parlante Pyle Sala Junta','Parlante Pyle para sala de juntas','Und',850000,0,0,150000,0,'',1),
@@ -485,34 +485,34 @@ PRODUCTOS = [
     ('AV-007','AUDIOVISUAL','Bocina Techo 5.25','Bocina techo 5.25" audio ambiente','Und',568000,0,0,150000,0,'',1),
     ('AV-008','AUDIOVISUAL','Subwoofer Polk','Subwoofer 10" clase D 100W Dolby Atmos','Und',2490000,0,0,0,0,'',1),
     ('AV-009','AUDIOVISUAL','Receptor AV 7.2 Canales','Receptor AV 7.2ch 80W 8K HDMI Dolby HEOS','Und',4350000,0,0,0,200000,'',1),
-    ('AV-010','AUDIOVISUAL','Receptor Sala de Juntas','Receptor estéreo M19-BT amplificador alta fidelidad','Und',0,0,0,0,200000,'',1),
-    ('AV-011','AUDIOVISUAL','Micrófono Conferencia 8en1','Micrófono altavoz conferencia 8 en 1','Und',745000,0,0,0,0,'',1),
-    ('AV-012','AUDIOVISUAL','Telón Proyector 100"','Pantalla proyector motorizada 100 pulgadas','Und',1050000,0,0,200000,0,'',1),
+    ('AV-010','AUDIOVISUAL','Receptor Sala de Juntas','Receptor estÃ©reo M19-BT amplificador alta fidelidad','Und',0,0,0,0,200000,'',1),
+    ('AV-011','AUDIOVISUAL','MicrÃ³fono Conferencia 8en1','MicrÃ³fono altavoz conferencia 8 en 1','Und',745000,0,0,0,0,'',1),
+    ('AV-012','AUDIOVISUAL','TelÃ³n Proyector 100"','Pantalla proyector motorizada 100 pulgadas','Und',1050000,0,0,200000,0,'',1),
     ('AV-013','AUDIOVISUAL','Proyector Optoma 4K','Optoma proyector 4K HD alto brillo 3D HDR','Und',5325100,0,0,200000,0,'',1),
     ('AV-014','AUDIOVISUAL','Ascensor Proyector','Accesorio ascensor motorizado para proyector','Und',3870000,0,0,200000,0,'',1),
     ('AV-015','AUDIOVISUAL','Cable RCA 50pies','Cable subwoofer 50ft RCA a RCA','Und',265000,0,0,0,0,'',1),
-    ('AV-016','AUDIOVISUAL','Cable HDMI 8K 25ft','Cable HDMI 8K 48Gbps versión 2.1','Und',280000,0,0,0,0,'',1),
+    ('AV-016','AUDIOVISUAL','Cable HDMI 8K 25ft','Cable HDMI 8K 48Gbps versiÃ³n 2.1','Und',280000,0,0,0,0,'',1),
     ('AV-017','AUDIOVISUAL','Fire TV 4K','Amazon Fire TV Stick 4K Max','Und',205000,0,0,0,0,'',1),
-    ('OTR-001','OTROS','Tapita Cat6 Negra','Placa pared Ethernet negra Cat6 certificación UL','Und',29700,0,0,0,0,'',1),
-    ('MO-001','SERVICIOS','Instalación Cámaras','Instalación física de cámara (incluye fijación)','Und',100000,0,0,0,0,'',1),
-    ('MO-002','SERVICIOS','Instalación Interruptores','Instalación interruptor domótico','Und',80000,0,0,0,0,'',1),
-    ('MO-003','SERVICIOS','Instalación Tomas','Instalación toma corriente','Und',90000,0,0,0,0,'',1),
-    ('MO-004','SERVICIOS','Instalación Decos/Red','Instalación dispositivo de red/deco','Und',50000,0,0,0,0,'',1),
-    ('MO-005','SERVICIOS','Configuración Sistema','Configuración y programación del sistema completo','Servicio',0,0,0,0,0,'',1),
-    ('MO-006','SERVICIOS','Montaje y Cableado Completo','Montaje, cableado, instalación y configuración total','Servicio',0,0,0,0,0,'',1),
+    ('OTR-001','OTROS','Tapita Cat6 Negra','Placa pared Ethernet negra Cat6 certificaciÃ³n UL','Und',29700,0,0,0,0,'',1),
+    ('MO-001','SERVICIOS','InstalaciÃ³n CÃ¡maras','InstalaciÃ³n fÃ­sica de cÃ¡mara (incluye fijaciÃ³n)','Und',100000,0,0,0,0,'',1),
+    ('MO-002','SERVICIOS','InstalaciÃ³n Interruptores','InstalaciÃ³n interruptor domÃ³tico','Und',80000,0,0,0,0,'',1),
+    ('MO-003','SERVICIOS','InstalaciÃ³n Tomas','InstalaciÃ³n toma corriente','Und',90000,0,0,0,0,'',1),
+    ('MO-004','SERVICIOS','InstalaciÃ³n Decos/Red','InstalaciÃ³n dispositivo de red/deco','Und',50000,0,0,0,0,'',1),
+    ('MO-005','SERVICIOS','ConfiguraciÃ³n Sistema','ConfiguraciÃ³n y programaciÃ³n del sistema completo','Servicio',0,0,0,0,0,'',1),
+    ('MO-006','SERVICIOS','Montaje y Cableado Completo','Montaje, cableado, instalaciÃ³n y configuraciÃ³n total','Servicio',0,0,0,0,0,'',1),
 ]
 
 PARAMS_DATA = [
     ('empresa','RC DOMOTIC'),('nit','1102809561'),
     ('direccion','Calle 31-8-88'),('ciudad','Sincelejo / Sucre'),
     ('telefono','3123042156'),('email',''),('web',''),
-    ('contacto','RAÚL CUELLO'),('banco','Bancolombia Ahorros'),
+    ('contacto','RAÃšL CUELLO'),('banco','Bancolombia Ahorros'),
     ('cuenta','506-826941-20'),('titular','RAUL CUELLO GONZALEZ'),
     ('iva_general','0.19'),('vigencia_dias','30'),
     ('forma_pago_default','70% - 30%'),('anticipo_default','0.70'),
     ('prefijo_cot','A05'),('consecutivo','60'),
-    ('garantia','6 meses en mano de obra / según fabricante en equipos'),
-    ('plazo_entrega','A convenir según proyecto'),
+    ('garantia','6 meses en mano de obra / segÃºn fabricante en equipos'),
+    ('plazo_entrega','A convenir segÃºn proyecto'),
     ('condiciones','Precios en COP incluyen equipos. La mano de obra se detalla por separado.'),
     ('logo_path', '/static/brand_logo.png'),
     ('watermark_path', '/static/watermark.png'),
@@ -540,7 +540,7 @@ def init_db():
             pass
         # Listas de precios por defecto
         defaults = [
-            ('PUBLICO', 'Público', 0.0, 1),
+            ('PUBLICO', 'PÃºblico', 0.0, 1),
             ('FRECUENTE', 'Cliente frecuente', 0.05, 1),
             ('ALIADO', 'Aliado / referido', 0.10, 1),
             ('MAYORISTA', 'Mayorista / constructor', 0.15, 1),
@@ -549,16 +549,16 @@ def init_db():
             conn.executemany("INSERT OR IGNORE INTO price_lists(code,name,desc_pct,active) VALUES (?,?,?,?)", defaults)
         except Exception:
             pass
-        print("✓ Base de datos inicializada con 65 productos")
+        print("âœ“ Base de datos inicializada con 65 productos")
 
-    # Si la BD ya existía (o viene de una versión anterior), puede no tener usuarios.
+    # Si la BD ya existÃ­a (o viene de una versiÃ³n anterior), puede no tener usuarios.
     # Aseguramos al menos 1 admin para que el login no quede bloqueado.
     try:
         n = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
         if int(n) == 0:
             conn.execute("INSERT INTO users(username,password_hash,role,must_change_password) VALUES (?,?,?,?)",
                          (admin_user, hash_password(admin_pass), 'admin', must_change_admin))
-            print("  ✓ Admin creado automáticamente (BD existente)")
+            print("  âœ“ Admin creado automÃ¡ticamente (BD existente)")
     except Exception:
         pass
     # Migraciones seguras
@@ -587,12 +587,12 @@ def init_db():
         ("cotizaciones", "abonado_val", "REAL DEFAULT 0"),
     ]
     for t, c, td in safe_cols:
-        try: conn.execute(f"ALTER TABLE {t} ADD COLUMN {c} {td}"); print(f"  ✓ Migración: {t}.{c}")
+        try: conn.execute(f"ALTER TABLE {t} ADD COLUMN {c} {td}"); print(f"  âœ“ MigraciÃ³n: {t}.{c}")
         except: pass
     for k, v in PARAMS_DATA:
         conn.execute("INSERT OR IGNORE INTO parametros (clave, valor) VALUES (?,?)", (k, v))
 
-    # Gastos por proyecto (ligados a una cotización)
+    # Gastos por proyecto (ligados a una cotizaciÃ³n)
     try:
         conn.execute("""
             CREATE TABLE IF NOT EXISTS gastos_proyecto (
@@ -609,7 +609,7 @@ def init_db():
     except Exception:
         pass
 
-    # Gastos por proyecto (asociados a una cotización)
+    # Gastos por proyecto (asociados a una cotizaciÃ³n)
     try:
         conn.execute("""CREATE TABLE IF NOT EXISTS gastos_proyecto (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -650,9 +650,9 @@ def init_db():
     conn.commit()
     conn.close()
 
-# ─── CÁLCULOS ─────────────────────────────────────────────────────────────────
+# â”€â”€â”€ CÃLCULOS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 def calcular_item(item, prod, price_list_desc_pct: float = 0.0):
-    """Calcula montos del ítem. Si no hay precio_manual, aplica descuento de lista."""
+    """Calcula montos del Ã­tem. Si no hay precio_manual, aplica descuento de lista."""
     pl = float(price_list_desc_pct or 0)
     base_precio = prod['precio']
     if item['precio_manual'] and item['precio_manual'] > 0:
@@ -688,7 +688,7 @@ def calcular_cotizacion(cot_id):
     avm = float(cot.get('anticipo_val_manual') or 0)
     anticipo_val = round(avm, 0) if avm and avm > 0 else anticipo_calc
 
-    # Abonado: lo que el cliente ya pagó (puede ser igual al anticipo o más)
+    # Abonado: lo que el cliente ya pagÃ³ (puede ser igual al anticipo o mÃ¡s)
     abonado_val = float(cot.get('abonado_val') or 0)
     if abonado_val < 0:
         abonado_val = 0
@@ -760,9 +760,9 @@ def preparar_presentacion_cotizacion(items):
 
     service_items = []
     if round(inst_total, 0) > 0:
-        service_items.append({'label': 'Instalación total', 'total': round(inst_total, 0)})
+        service_items.append({'label': 'InstalaciÃ³n total', 'total': round(inst_total, 0)})
     if round(cfg_total, 0) > 0:
-        service_items.append({'label': 'Configuración total', 'total': round(cfg_total, 0)})
+        service_items.append({'label': 'ConfiguraciÃ³n total', 'total': round(cfg_total, 0)})
 
     return {
         'items': display_items,
@@ -791,7 +791,7 @@ def ensure_public_token(cot_id:int):
     exp = (cot.get('public_expires_at') or '').strip()
 
     now = datetime.datetime.utcnow()
-    # si existe expiración y ya pasó, rotamos token
+    # si existe expiraciÃ³n y ya pasÃ³, rotamos token
     expired = False
     if exp:
         try:
@@ -815,7 +815,7 @@ def ensure_public_token(cot_id:int):
     execute("UPDATE cotizaciones SET public_token=? WHERE id=?", (tok, cot_id))
     return tok
 
-# ─── MÁRGENES ────────────────────────────────────────────────────────────────
+# â”€â”€â”€ MÃRGENES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 def calcular_margenes(cot_id):
     cot = query("SELECT * FROM cotizaciones WHERE id=?", (cot_id,), one=True)
     if not cot: return None
@@ -873,7 +873,7 @@ def calcular_margenes(cot_id):
             'costos_ok': costos_ok,
             'items': det}
 
-# ─── IMÁGENES ────────────────────────────────────────────────────────────────
+# â”€â”€â”€ IMÃGENES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 def allowed_file(fn):
     return '.' in fn and fn.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
@@ -881,11 +881,23 @@ def _sync_catalog_images_from_uploads(conn):
     """
     Sincroniza imagen_url en catalogo usando archivos locales en uploads/products.
     Regla de nombre esperada: <ID_PRODUCTO>_*.jpg|png|webp...
+    Preferencia: amazon > local > catalogo > otros.
     """
     try:
         if not os.path.isdir(UPLOAD_FOLDER):
-            return
+            return 0
         mapping = {}
+
+        def _img_priority(fn: str) -> int:
+            low = fn.lower()
+            if '_amazon' in low:
+                return 3
+            if '_local' in low:
+                return 2
+            if '_catalogo' in low:
+                return 1
+            return 0
+
         for fn in sorted(os.listdir(UPLOAD_FOLDER)):
             fpath = os.path.join(UPLOAD_FOLDER, fn)
             if not os.path.isfile(fpath):
@@ -899,8 +911,12 @@ def _sync_catalog_images_from_uploads(conn):
             pid = m.group(1).upper()
             if pid not in mapping:
                 mapping[pid] = fn
+            else:
+                cur = mapping[pid]
+                if _img_priority(fn) > _img_priority(cur):
+                    mapping[pid] = fn
         if not mapping:
-            return
+            return 0
 
         rows = conn.execute("SELECT id_producto, imagen_url FROM catalogo").fetchall()
         updates = 0
@@ -919,23 +935,39 @@ def _sync_catalog_images_from_uploads(conn):
                 cur_path = os.path.join(UPLOAD_FOLDER, cur_fn)
                 if not os.path.isfile(cur_path):
                     must_update = True
+                else:
+                    if _img_priority(fallback_fn) > _img_priority(cur_fn):
+                        must_update = True
             if must_update:
                 conn.execute("UPDATE catalogo SET imagen_url=? WHERE id_producto=?", (fallback_url, pid))
                 updates += 1
         if updates:
             conn.commit()
-            print(f"✓ Imagenes sincronizadas desde uploads/products: {updates}")
+            print(f"IMG_SYNC: {updates} imagenes actualizadas desde uploads/products")
+        return updates
     except Exception as e:
         print("[WARN] No se pudo sincronizar imagenes de catalogo:", e)
-
+        return 0
 @app.route('/uploads/products/<path:filename>')
 def serve_upload(filename):
     return send_from_directory(UPLOAD_FOLDER, filename)
 
+@app.post('/api/catalogo/sync_images')
+@role_required('admin')
+
+def sync_catalog_images():
+    """Admin: fuerza sync de imagenes desde uploads/products."""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        n = _sync_catalog_images_from_uploads(conn)
+        return jsonify({'ok': True, 'updated': n})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
 @app.post('/api/catalogo/<id_producto>/imagen')
 @role_required('admin')
 def upload_product_image(id_producto):
-    if 'file' not in request.files: return jsonify({'error': 'No se envió archivo'}), 400
+    if 'file' not in request.files: return jsonify({'error': 'No se enviÃ³ archivo'}), 400
     f = request.files['file']
     if not f or not allowed_file(f.filename): return jsonify({'error': 'Archivo no permitido'}), 400
     ext = f.filename.rsplit('.', 1)[1].lower()
@@ -953,7 +985,7 @@ def upload_product_image(id_producto):
         png_path = os.path.join(UPLOAD_FOLDER, png_name)
         try:
             _remove_white_bg_to_png(path, png_path)
-            # si se generó png, usamos ese y borramos el original
+            # si se generÃ³ png, usamos ese y borramos el original
             try:
                 os.remove(path)
             except Exception:
@@ -976,13 +1008,13 @@ def _is_private_ip(ip: str) -> bool:
         return True
 
 def _safe_download_image(url: str, timeout: int = 12, max_bytes: int = 2_500_000) -> bytes:
-    """Descarga segura: solo http/https, bloquea localhost/redes privadas, limita tamaño."""
+    """Descarga segura: solo http/https, bloquea localhost/redes privadas, limita tamaÃ±o."""
     parsed = urllib.parse.urlparse(url)
     if parsed.scheme not in ('http', 'https'):
         raise ValueError('Solo URLs http/https')
     host = parsed.hostname
     if not host:
-        raise ValueError('Host inválido')
+        raise ValueError('Host invÃ¡lido')
     # Resolver DNS y bloquear IPs privadas
     try:
         infos = socket.getaddrinfo(host, None)
@@ -1079,7 +1111,7 @@ def delete_product_image(id_producto):
     execute("UPDATE catalogo SET imagen_url='' WHERE id_producto=?", (id_producto,))
     return jsonify({'ok': True})
 
-# ─── RUTAS API ────────────────────────────────────────────────────────────────
+# â”€â”€â”€ RUTAS API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @app.get('/health')
 def health():
@@ -1102,14 +1134,14 @@ def api_login():
     username = (d.get('username') or '').strip()
     password = d.get('password') or ''
     if not username or not password:
-        return jsonify({'ok': False, 'error': 'Usuario y contraseña requeridos'}), 400
+        return jsonify({'ok': False, 'error': 'Usuario y contraseÃ±a requeridos'}), 400
 
     u = query("SELECT * FROM users WHERE username=?", (username,), one=True)
     if not u or not verify_password(u.get('password_hash') or '', password):
-        # Respuesta genérica para no filtrar existencia de usuarios
-        return jsonify({'ok': False, 'error': 'Credenciales inválidas'}), 401
+        # Respuesta genÃ©rica para no filtrar existencia de usuarios
+        return jsonify({'ok': False, 'error': 'Credenciales invÃ¡lidas'}), 401
 
-    # Rotación automática a Argon2 cuando esté disponible
+    # RotaciÃ³n automÃ¡tica a Argon2 cuando estÃ© disponible
     try:
         ph = u.get('password_hash') or ''
         if _ARGON2 and (not ph.startswith('$argon2')):
@@ -1117,7 +1149,7 @@ def api_login():
     except Exception:
         pass
 
-    # CSRF token de sesión
+    # CSRF token de sesiÃ³n
     tok = _csrf_token()
 
     must_change = int(u.get('must_change_password') or 0) == 1
@@ -1139,15 +1171,15 @@ def api_change_password():
     old = d.get('old_password') or ''
     new = d.get('new_password') or ''
     if not new or len(new) < 10:
-        return jsonify({'ok': False, 'error': 'La nueva contraseña debe tener mínimo 10 caracteres.'}), 400
+        return jsonify({'ok': False, 'error': 'La nueva contraseÃ±a debe tener mÃ­nimo 10 caracteres.'}), 400
     u = current_user()
     row = query("SELECT * FROM users WHERE id=?", (u['id'],), one=True)
     if not row:
         return jsonify({'ok': False, 'error': 'Usuario no encontrado'}), 404
     if not verify_password(row.get('password_hash') or '', old):
-        return jsonify({'ok': False, 'error': 'Contraseña actual incorrecta'}), 401
+        return jsonify({'ok': False, 'error': 'ContraseÃ±a actual incorrecta'}), 401
     execute("UPDATE users SET password_hash=?, must_change_password=0 WHERE id=?", (hash_password(new), row['id']))
-    # refrescar bandera en sesión
+    # refrescar bandera en sesiÃ³n
     session['user']['must_change_password'] = False
     return jsonify({'ok': True})
 
@@ -1185,7 +1217,7 @@ def update_producto(id_producto):
     return jsonify({'ok': True})
 
 
-# ─── ID CONSECUTIVO POR CATEGORÍA ──────────────────────────────────────────
+# â”€â”€â”€ ID CONSECUTIVO POR CATEGORÃA â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 PREFIX_MAP = {
     'CCTV': 'CAM',
     'DOMOTICA': 'DOM',
@@ -1232,7 +1264,7 @@ def create_producto():
     return jsonify({'ok': True, 'id': d['id_producto']})
 
 
-# ─── INVENTARIO ─────────────────────────────────────────────────────────────
+# â”€â”€â”€ INVENTARIO â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 @app.get('/api/inventario')
 @role_required('admin')
 def api_inventario():
@@ -1317,7 +1349,7 @@ def api_inv_mov():
     execute("UPDATE catalogo SET stock_qty=COALESCE(?,0) WHERE id_producto=?", (float(total.get('t') or 0), pid))
     return jsonify({'ok': True})
 
-# ─── PROVEEDORES ────────────────────────────────────────────────────────────
+# â”€â”€â”€ PROVEEDORES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 @app.get('/api/proveedores')
 @role_required('admin')
 def api_proveedores_list():
@@ -1334,7 +1366,7 @@ def api_proveedores_create():
                   (d['nombre'].strip(), d.get('whatsapp',''), d.get('email',''), d.get('condiciones','')))
     return jsonify({'ok': True, 'id': pid})
 
-# ─── COMPRAS ────────────────────────────────────────────────────────────────
+# â”€â”€â”€ COMPRAS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 def _gen_no_compra():
     y = datetime.datetime.now().strftime('%y')
     n = query("SELECT COUNT(*) as n FROM compras", one=True)['n']
@@ -1387,7 +1419,7 @@ def api_compras_create():
     return jsonify({'ok': True, 'id': compra_id, 'no_compra': no, 'total': total})
 
 
-# ─── PAQUETES ───────────────────────────────────────────────────────────────
+# â”€â”€â”€ PAQUETES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 @app.get('/api/paquetes')
 def api_paquetes_list():
     q = request.args.get('q','').strip()
@@ -1433,7 +1465,7 @@ def api_paquetes_get(pid):
                   "WHERE pi.paquete_id=? ORDER BY c.categoria, c.nombre", (pid,))
     return jsonify({'ok': True, 'pack': pack, 'items': items})
 
-# ─── CRM ────────────────────────────────────────────────────────────────────
+# â”€â”€â”€ CRM â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 @app.get('/api/crm/pipeline')
 def api_crm_pipeline():
     etapa = (request.args.get('etapa') or '').upper().strip()
@@ -1446,7 +1478,7 @@ def api_crm_pipeline():
     sql += " ORDER BY created_at DESC LIMIT 300"
     rows = query(sql, params)
     for r in rows:
-        # Normalizar etapa según estado para que el pipeline se vea coherente
+        # Normalizar etapa segÃºn estado para que el pipeline se vea coherente
         est = (r.get('estado') or 'BORRADOR').upper().strip()
         et = (r.get('etapa') or '').upper().strip()
         if not et or et == 'LEAD':
@@ -1509,7 +1541,7 @@ def get_cotizaciones():
     cots = query(sql, p)
     for c in cots:
         c.update(calcular_cotizacion(c['id']))
-        # Añadir rentabilidad resumida para tarjetas (solo interno)
+        # AÃ±adir rentabilidad resumida para tarjetas (solo interno)
         try:
             m = calcular_margenes(c['id'])
             c['utilidad_neta'] = m.get('utilidad_neta', 0)
@@ -1538,15 +1570,15 @@ def create_cotizacion():
         checklist_json = chk
     else:
         checklist_json = json.dumps([
-            {"label":"Visita técnica", "done": False},
+            {"label":"Visita tÃ©cnica", "done": False},
             {"label":"Medidas confirmadas", "done": False},
             {"label":"Cliente aprueba equipos", "done": False},
             {"label":"Anticipo recibido", "done": False},
-            {"label":"Programación agenda", "done": False},
-            {"label":"Instalación completa", "done": False},
-            {"label":"Entrega y capacitación", "done": False},
+            {"label":"ProgramaciÃ³n agenda", "done": False},
+            {"label":"InstalaciÃ³n completa", "done": False},
+            {"label":"Entrega y capacitaciÃ³n", "done": False},
         ], ensure_ascii=False)
-    # Al crear manualmente, también queda en etapa COTIZADA por defecto
+    # Al crear manualmente, tambiÃ©n queda en etapa COTIZADA por defecto
     cot_id = execute("""INSERT INTO cotizaciones
         (no_cotizacion,cliente,empresa,nit_cc,telefono,email_cliente,direccion,ciudad,
          proyecto,tipo_cotizacion,forma_pago,
@@ -1587,7 +1619,7 @@ def get_cotizacion(cot_id):
     return jsonify(cot)
 
 
-# ─── GASTOS POR PROYECTO (ligados a cotización) ──────────────────────────────
+# â”€â”€â”€ GASTOS POR PROYECTO (ligados a cotizaciÃ³n) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 @app.get('/api/cotizaciones/<int:cot_id>/gastos')
 @role_required('admin','vendedor')
 def api_list_gastos(cot_id):
@@ -1645,7 +1677,7 @@ def update_cotizacion(cot_id):
                 (d.get("estado", curr.get("estado", "BORRADOR")), cot_id))
         return jsonify({"ok": True})
 
-    # Campos obligatorios que nunca pueden quedar vacíos
+    # Campos obligatorios que nunca pueden quedar vacÃ­os
     REQUIRED_FIELDS = {"cliente", "tipo_cotizacion", "forma_pago"}
 
     def keep(key, default=""):
@@ -1775,7 +1807,7 @@ def clone_cotizacion(cot_id):
     if not src:
         return jsonify({'ok': False, 'error': 'No existe'}), 404
     no_cot = next_no_cotizacion()
-    # Copia sin aceptación ni token público
+    # Copia sin aceptaciÃ³n ni token pÃºblico
     new_id = execute("""INSERT INTO cotizaciones (
         no_cotizacion,cliente,empresa,nit_cc,telefono,email_cliente,direccion,ciudad,
         proyecto,tipo_cotizacion,forma_pago,anticipo_pct,descuento_pct,descuento_val,notas,
@@ -1826,7 +1858,7 @@ def update_parametros():
     return jsonify({'ok': True})
 
 
-# ─── Listas de precios (perfil) ────────────────────────────────────────────
+# â”€â”€â”€ Listas de precios (perfil) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 @app.get('/api/price_lists')
 @role_required('admin')
 def api_price_lists():
@@ -1861,13 +1893,13 @@ def get_margenes(cot_id):
 
 @app.get('/api/cotizaciones/<int:cot_id>/whatsapp')
 def whatsapp_link(cot_id):
-    """Genera enlace de WhatsApp al número del cliente con un mensaje SIN valores (solo link público)."""
+    """Genera enlace de WhatsApp al nÃºmero del cliente con un mensaje SIN valores (solo link pÃºblico)."""
     import urllib.parse
     cot = query("SELECT * FROM cotizaciones WHERE id=?", (cot_id,), one=True)
     if not cot:
         return ('Not found', 404)
 
-    # Normalizar teléfono (Colombia): si viene 10 dígitos, prefijar 57
+    # Normalizar telÃ©fono (Colombia): si viene 10 dÃ­gitos, prefijar 57
     tel = re.sub(r'\D', '', (cot.get('telefono') or ''))
     if tel:
         if len(tel) == 10:
@@ -1885,12 +1917,12 @@ def whatsapp_link(cot_id):
     proyecto = cot.get('proyecto') or 'N/A'
     msg = (
         f"Hola {cot.get('cliente','')}!\n\n"
-        f"Te comparto tu cotización de RC DOMOTIC para {proyecto}.\n"
-        f"N° {cot.get('no_cotizacion','')}\n\n"
+        f"Te comparto tu cotizaciÃ³n de RC DOMOTIC para {proyecto}.\n"
+        f"NÂ° {cot.get('no_cotizacion','')}\n\n"
         f"PDF: {pdf_url}\n"
         f"Ver y aceptar en web: {public_url}\n\n"
         f"Quedo atento.\n"
-        f"Raúl Cuello — RC DOMOTIC\n"
+        f"RaÃºl Cuello â€” RC DOMOTIC\n"
         f"Tel: 3123042156"
     )
 
@@ -1929,12 +1961,12 @@ def cot_share(cot_id):
     proyecto = (cot.get('proyecto') or '').strip() or 'N/A'
     resumen = (
         f"Hola {cliente}!\n\n"
-        f"Te comparto tu cotización de RC DOMOTIC para {proyecto}.\n"
-        f"N° {no}\n\n"
+        f"Te comparto tu cotizaciÃ³n de RC DOMOTIC para {proyecto}.\n"
+        f"NÂ° {no}\n\n"
         f"PDF: {pdf_url}\n"
         f"Ver y aceptar en web: {public_url}\n\n"
         f"Quedo atento.\n"
-        f"Raúl Cuello — RC DOMOTIC\n"
+        f"RaÃºl Cuello â€” RC DOMOTIC\n"
         f"Tel: 3123042156"
     )
 
@@ -1943,7 +1975,7 @@ def cot_share(cot_id):
         tel = '57' + tel
     wa_url = f"https://wa.me/{tel}?text={urllib.parse.quote(resumen)}" if tel else f"https://wa.me/?text={urllib.parse.quote(resumen)}"
 
-    subj = f"Cotización {no or ''} - RC DOMOTIC".strip()
+    subj = f"CotizaciÃ³n {no or ''} - RC DOMOTIC".strip()
     body = resumen
     mailto = f"mailto:?subject={urllib.parse.quote(subj)}&body={urllib.parse.quote(body)}"
 
@@ -1957,7 +1989,7 @@ def cot_share(cot_id):
         'resumen': resumen
     })
 
-# ─── DASHBOARD STATS (solo APROBADA para ventas) ────────────────────────────
+# â”€â”€â”€ DASHBOARD STATS (solo APROBADA para ventas) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 @app.get('/api/stats')
 @role_required('admin')
 def get_stats():
@@ -2030,7 +2062,7 @@ def get_dashboard():
         ) c WHERE total IS NOT NULL
         GROUP BY c.cliente ORDER BY valor DESC LIMIT 10""", (mes_actual,))
 
-    # Proyección
+    # ProyecciÃ³n
     dia_hoy = now.day
     prom_diario = venta_mes / dia_hoy if dia_hoy > 0 else 0
     import calendar
@@ -2052,7 +2084,7 @@ def get_dashboard():
 @app.get('/api/stats/series')
 @role_required('admin')
 def get_stats_series():
-    """Series para el gráfico de Ventas.
+    """Series para el grÃ¡fico de Ventas.
 
     Params:
       - period: week | month | quarter | year   (default: month)
@@ -2122,7 +2154,7 @@ def get_stats_series():
                 dias.append({'dia': ms, 'total': total_for('c.fecha LIKE ?', (ms + '%',))})
 
         else:
-            # month (default): últimos 30 días
+            # month (default): Ãºltimos 30 dÃ­as
             for i in range(29, -1, -1):
                 d = today - datetime.timedelta(days=i)
                 ds = d.strftime('%Y-%m-%d')
@@ -2142,7 +2174,7 @@ def get_stats_bi():
       - scope: APROBADA | ALL     (default: APROBADA)
       - period: week|month|quarter|year|all (default: year)
 
-    Nota: inventario/SKUs/categorías se calculan sobre catálogo activo (no dependen del periodo).
+    Nota: inventario/SKUs/categorÃ­as se calculan sobre catÃ¡logo activo (no dependen del periodo).
     """
     scope = (request.args.get('scope') or 'APROBADA').strip().upper()
     period = (request.args.get('period') or 'year').strip().lower()
@@ -2207,7 +2239,7 @@ def get_stats_bi():
     skus = (query("SELECT COUNT(*) as n FROM catalogo WHERE activo=1", one=True) or {'n': 0})['n']
     cats = (query("SELECT COUNT(DISTINCT categoria) as n FROM catalogo WHERE activo=1", one=True) or {'n': 0})['n']
 
-    # ventas por "departamento" (categoría) — del periodo
+    # ventas por "departamento" (categorÃ­a) â€” del periodo
     dept = query(f"""
       SELECT cat.categoria as dept,
              SUM((CASE WHEN i.precio_manual>0 THEN i.precio_manual ELSE cat.precio END)*i.cantidad
@@ -2299,13 +2331,13 @@ def get_stats_ops():
         meta_row = query("SELECT valor FROM parametros WHERE clave='meta_ventas_mes'", one=True)
         meta_mes = float(meta_row['valor']) if meta_row and meta_row.get('valor') else 0
 
-        # Alertas: enviadas sin respuesta hace >3 días
+        # Alertas: enviadas sin respuesta hace >3 dÃ­as
         sin_resp = query(
             "SELECT id, no_cotizacion, cliente, fecha, total_final FROM cotizaciones "
             "WHERE estado='ENVIADA' AND date(fecha) <= date('now','-3 days') "
             "ORDER BY fecha ASC LIMIT 10")
 
-        # Alertas: por vencer (borrador/enviada, creadas hace > vigencia-2 días)
+        # Alertas: por vencer (borrador/enviada, creadas hace > vigencia-2 dÃ­as)
         umbral = max(vigencia - 2, 1)
         por_vencer = query(
             f"SELECT id, no_cotizacion, cliente, fecha, total_final FROM cotizaciones "
@@ -2313,12 +2345,12 @@ def get_stats_ops():
             f"AND date(fecha) <= date('now','-{umbral} days') "
             f"ORDER BY fecha ASC LIMIT 10")
 
-        # Recientemente aprobadas (últimas 5, este mes)
+        # Recientemente aprobadas (Ãºltimas 5, este mes)
         recien_aprobadas = query(
             "SELECT id, no_cotizacion, cliente, fecha, total_final FROM cotizaciones "
             "WHERE estado='APROBADA' ORDER BY id DESC LIMIT 5")
 
-        # Actividad reciente (últimas 8 cotizaciones por id)
+        # Actividad reciente (Ãºltimas 8 cotizaciones por id)
         actividad = query(
             "SELECT id, no_cotizacion, cliente, fecha, total_final, estado "
             "FROM cotizaciones ORDER BY id DESC LIMIT 8")
@@ -2342,10 +2374,10 @@ def get_stats_ops():
         return jsonify({'ok': False, 'error': str(e)})
 
 
-# ─── COMANDOS (SEGURO — no SQL libre) ───────────────────────────────────────
+# â”€â”€â”€ COMANDOS (SEGURO â€” no SQL libre) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 @app.post('/api/commands/create_quote')
 def cmd_create_quote():
-    """Crear cotización desde JSON validado. SIN SQL libre."""
+    """Crear cotizaciÃ³n desde JSON validado. SIN SQL libre."""
     payload = request.json or {}
     payload_str = json.dumps(payload, ensure_ascii=False)
     try:
@@ -2358,9 +2390,9 @@ def cmd_create_quote():
         if not (0 <= desc_pct <= 100): errors.append("descuento_pct debe estar entre 0 y 100")
         if not (0 <= ant_pct <= 100): errors.append("anticipo_pct debe estar entre 0 y 100")
         raw_items = payload.get('items', [])
-        if not raw_items: errors.append("'items' no puede estar vacío")
+        if not raw_items: errors.append("'items' no puede estar vacÃ­o")
 
-        # Validar ítems y merge duplicados
+        # Validar Ã­tems y merge duplicados
         merged = {}
         missing = []
         for it in raw_items:
@@ -2370,7 +2402,7 @@ def cmd_create_quote():
             inst = float(it.get('inst', 0))
             cfg = float(it.get('cfg', 0))
             if inst < 0 or cfg < 0: errors.append(f"inst/cfg de '{cod}' no pueden ser negativos")
-            # Verificar que existe en catálogo
+            # Verificar que existe en catÃ¡logo
             prod = query("SELECT * FROM catalogo WHERE id_producto=? AND activo=1", (cod,), one=True)
             if not prod:
                 missing.append(cod)
@@ -2381,13 +2413,13 @@ def cmd_create_quote():
                 merged[cod] = {'id_producto': cod, 'cantidad': cant,
                                'precio_manual': 0, 'inst_manual': inst, 'cfg_manual': cfg, 'notas_item': ''}
 
-        if missing: errors.append(f"Códigos no encontrados en catálogo: {', '.join(missing)}")
+        if missing: errors.append(f"CÃ³digos no encontrados en catÃ¡logo: {', '.join(missing)}")
         if errors:
             execute("INSERT INTO commands_log (payload, status, error_msg) VALUES (?,?,?)",
                     (payload_str, 'ERROR', '; '.join(errors)))
             return jsonify({'ok': False, 'errors': errors}), 400
 
-        # Crear cotización
+        # Crear cotizaciÃ³n
         items_list = list(merged.values())
         data = {
             'cliente': cliente,
@@ -2426,7 +2458,7 @@ def cmd_create_quote():
         execute("INSERT INTO commands_log (payload, status, cot_id) VALUES (?,?,?)",
                 (payload_str, 'OK', cot_id))
         return jsonify({'ok': True, 'id': cot_id, 'no_cotizacion': no_cot,
-                        'items_merged': len(items_list), 'message': f'Cotización {no_cot} creada'})
+                        'items_merged': len(items_list), 'message': f'CotizaciÃ³n {no_cot} creada'})
 
     except Exception as e:
         tb = traceback.format_exc()
@@ -2435,7 +2467,7 @@ def cmd_create_quote():
                 (payload_str, 'ERROR', str(e)))
         return jsonify({'ok': False, 'errors': [str(e)]}), 500
 
-# ─── EXCEL EXPORT (CON TRY/EXCEPT ROBUSTO) ──────────────────────────────────
+# â”€â”€â”€ EXCEL EXPORT (CON TRY/EXCEPT ROBUSTO) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 @app.get('/export/excel/<int:cot_id>')
 @login_required
 def export_excel(cot_id):
@@ -2478,16 +2510,16 @@ def export_excel(cot_id):
         # HOJA 1
         ws1 = wb.active; ws1.title = "Cotizacion"
         info = [("Empresa:", params.get('empresa','')), ("NIT:", params.get('nit','')), ("",""),
-                ("Cotización:", cot.get('no_cotizacion','')), ("Fecha:", cot.get('fecha','')),
+                ("CotizaciÃ³n:", cot.get('no_cotizacion','')), ("Fecha:", cot.get('fecha','')),
                 ("Cliente:", cot.get('cliente','')), ("Empresa:", cot.get('empresa','')),
-                ("Proyecto:", cot.get('proyecto','')), ("Teléfono:", cot.get('telefono','')),
+                ("Proyecto:", cot.get('proyecto','')), ("TelÃ©fono:", cot.get('telefono','')),
                 ("Ciudad:", cot.get('ciudad',''))]
         for i, (l, v) in enumerate(info, 1):
             ws1.cell(row=i, column=1, value=l).font = Font(bold=True)
             ws1.cell(row=i, column=2, value=str(v or ''))
 
         r = len(info) + 2
-        hs = ["#","Código","Producto","Descripción","Und","Cant.","P.Unit.","IVA","Inst.","Config.","Total"]
+        hs = ["#","CÃ³digo","Producto","DescripciÃ³n","Und","Cant.","P.Unit.","IVA","Inst.","Config.","Total"]
         for c, h in enumerate(hs, 1): ws1.cell(row=r, column=c, value=h)
         sh(ws1, r, len(hs)); r += 1
 
@@ -2516,7 +2548,7 @@ def export_excel(cot_id):
         # HOJA 2
         if marg:
             ws2 = wb.create_sheet("Interno"); ws2.sheet_properties.tabColor = "25D366"
-            h2 = ["#","Código","Producto","Cant.","P.Venta","Costo Unit.","Costo Item","Venta Item","Utilidad","Margen %"]
+            h2 = ["#","CÃ³digo","Producto","Cant.","P.Venta","Costo Unit.","Costo Item","Venta Item","Utilidad","Margen %"]
             for c, h in enumerate(h2, 1): ws2.cell(row=1, column=c, value=h)
             sh(ws2, 1, len(h2)); r2 = 2
             for idx, mi in enumerate(marg.get('items',[]), 1):
@@ -2560,10 +2592,10 @@ def export_excel(cot_id):
         print(f"[EXCEL ERROR] {tb_str}")
         return jsonify({'error': str(e), 'traceback': tb_str}), 500
 
-# ─── PDF / Print ─────────────────────────────────────────────────────────────
+# â”€â”€â”€ PDF / Print â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 PRINT_TEMPLATE = """<!DOCTYPE html>
 <html lang="es"><head><meta charset="UTF-8">
-<title>Cotización {{ cot.no_cotizacion }}</title>
+<title>CotizaciÃ³n {{ cot.no_cotizacion }}</title>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:'Segoe UI',Arial,sans-serif;font-size:12px;color:#111;padding:20px;position:relative}
@@ -2612,18 +2644,18 @@ PRINT_TEMPLATE = """<!DOCTYPE html>
 <div class="content">
 <div class="no-print" style="margin-bottom:16px">
   <button onclick="window.print()" style="background:{{ accent_soft }};color:{{ accent_soft_text }};border:none;padding:8px 20px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600">Imprimir / Guardar PDF</button>
-  <button onclick="window.close()" style="background:#666;color:#fff;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;margin-left:8px">✕ Cerrar</button>
+  <button onclick="window.close()" style="background:#666;color:#fff;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;margin-left:8px">âœ• Cerrar</button>
 </div>
 <div class="cover">
   <div class="left">
     {% if logo_exists %}<img class="logo" src="{{ logo_url }}" alt="Logo">{% endif %}
     <div>
       <div class="title">{{ params.empresa or 'RC DOMOTIC' }}</div>
-      <div class="sub">{{ params.ciudad }} · {{ params.direccion }}<br>Tel: {{ params.telefono }} · {{ params.email }}</div>
+      <div class="sub">{{ params.ciudad }} Â· {{ params.direccion }}<br>Tel: {{ params.telefono }} Â· {{ params.email }}</div>
     </div>
   </div>
   <div class="box">
-    <div class="meta">COTIZACIÓN</div>
+    <div class="meta">COTIZACIÃ“N</div>
     <div class="num">{{ cot.no_cotizacion }}</div>
     <div class="meta">Fecha: {{ cot.fecha }}</div>
   </div>
@@ -2632,12 +2664,12 @@ PRINT_TEMPLATE = """<!DOCTYPE html>
 <div class="section-title">DATOS DEL CLIENTE</div>
 <div class="info-grid">
   <div class="info-row"><span class="info-label">Cliente:</span> <strong>{{ cot.cliente }}</strong></div>
-  <div class="info-row"><span class="info-label">Proyecto:</span> {{ cot.proyecto or '—' }}</div>
-  <div class="info-row"><span class="info-label">Empresa:</span> {{ cot.empresa or '—' }}</div>
-  <div class="info-row"><span class="info-label">Ciudad:</span> {{ cot.ciudad or '—' }}</div>
-  <div class="info-row"><span class="info-label">NIT/CC:</span> {{ cot.nit_cc or '—' }}</div>
+  <div class="info-row"><span class="info-label">Proyecto:</span> {{ cot.proyecto or 'â€”' }}</div>
+  <div class="info-row"><span class="info-label">Empresa:</span> {{ cot.empresa or 'â€”' }}</div>
+  <div class="info-row"><span class="info-label">Ciudad:</span> {{ cot.ciudad or 'â€”' }}</div>
+  <div class="info-row"><span class="info-label">NIT/CC:</span> {{ cot.nit_cc or 'â€”' }}</div>
   <div class="info-row"><span class="info-label">Tipo:</span> {{ cot.tipo_cotizacion }}</div>
-  <div class="info-row"><span class="info-label">Teléfono:</span> {{ cot.telefono or '—' }}</div>
+  <div class="info-row"><span class="info-label">TelÃ©fono:</span> {{ cot.telefono or 'â€”' }}</div>
   <div class="info-row"><span class="info-label">Forma pago:</span> {{ cot.forma_pago }}</div>
 </div>
 <div class="section-title">DETALLE DE PRODUCTOS</div>
@@ -2685,8 +2717,8 @@ PRINT_TEMPLATE = """<!DOCTYPE html>
 </table></div><div style="clear:both"></div>
 {% if cot.notas %}<div style="margin-top:10px;padding:7px 10px;background:#f5f5f5;border-left:3px solid {{ accent_soft }};font-size:11px"><strong>Notas:</strong> {{ cot.notas }}</div>{% endif %}
 <div class="sign"><div class="sign-line">Firma Cliente<br>{{ cot.cliente }}</div><div class="sign-line">RC DOMOTIC<br>{{ params.contacto }}</div></div>
-<div class="footer"><div>✔ Garantía: {{ params.garantia }}<br>✔ Vigencia: {{ params.vigencia_dias }} días · ✔ Plazo: {{ params.plazo_entrega }}</div>
-<div style="text-align:right">Consignaciones: {{ params.banco }}<br>Cta. {{ params.cuenta }} · {{ params.titular }}<br>CC {{ params.nit }}</div></div>
+<div class="footer"><div>âœ” GarantÃ­a: {{ params.garantia }}<br>âœ” Vigencia: {{ params.vigencia_dias }} dÃ­as Â· âœ” Plazo: {{ params.plazo_entrega }}</div>
+<div style="text-align:right">Consignaciones: {{ params.banco }}<br>Cta. {{ params.cuenta }} Â· {{ params.titular }}<br>CC {{ params.nit }}</div></div>
 </div></body></html>"""
 
 @app.get('/print/<int:cot_id>')
@@ -2722,10 +2754,10 @@ def print_cotizacion(cot_id):
         logo_url=logo_url, watermark_url=watermark_url, logo_exists=le, watermark_exists=we)
 
 
-# ─── Vista pública sin login + aceptación ───────────────────────────────────
+# â”€â”€â”€ Vista pÃºblica sin login + aceptaciÃ³n â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 PUBLIC_VIEW_TEMPLATE = """<!doctype html><html lang='es'><head>
 <meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1'>
-<title>Cotización {{ cot.no_cotizacion }} - RC DOMOTIC</title>
+<title>CotizaciÃ³n {{ cot.no_cotizacion }} - RC DOMOTIC</title>
 <style>
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
   body{font-family:system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; margin:0; background:#f0f2f5; color:#1a1d21; line-height:1.6; -webkit-font-smoothing:antialiased}
@@ -2770,24 +2802,24 @@ PUBLIC_VIEW_TEMPLATE = """<!doctype html><html lang='es'><head>
       <div class='top'>
         <div class='logo'>RC</div>
         <div class='grow'>
-          <p class='h1'>Cotización {{ cot.no_cotizacion }}</p>
-          <div class='sub'>{{ cot.fecha }} · {{ cot.cliente }} · {{ cot.proyecto or 'N/A' }}</div>
+          <p class='h1'>CotizaciÃ³n {{ cot.no_cotizacion }}</p>
+          <div class='sub'>{{ cot.fecha }} Â· {{ cot.cliente }} Â· {{ cot.proyecto or 'N/A' }}</div>
         </div>
         <a class='btn' href='{{ pdf_url }}' target='_blank'>Descargar PDF</a>
       </div>
       <div class='content'>
         <div style='display:flex; gap:10px; align-items:center; flex-wrap:wrap;'>
           {% if cot.accepted %}
-            <span class='stamp ok'>ACEPTADA ✓</span>
-            <span class='sub'>{{ cot.accepted_name or cot.cliente }} · {{ cot.accepted_at }}</span>
+            <span class='stamp ok'>ACEPTADA âœ“</span>
+            <span class='sub'>{{ cot.accepted_name or cot.cliente }} Â· {{ cot.accepted_at }}</span>
           {% else %}
-            <span class='stamp warn'>PENDIENTE DE ACEPTACIÓN</span>
+            <span class='stamp warn'>PENDIENTE DE ACEPTACIÃ“N</span>
           {% endif %}
         </div>
         <div class='grid' style='margin-top:12px'>
           <div class='row'><strong>Cliente</strong><br>{{ cot.cliente }}</div>
-          <div class='row'><strong>Teléfono</strong><br>{{ cot.telefono or '—' }}</div>
-          <div class='row'><strong>Empresa</strong><br>{{ cot.empresa or '—' }}</div>
+          <div class='row'><strong>TelÃ©fono</strong><br>{{ cot.telefono or 'â€”' }}</div>
+          <div class='row'><strong>Empresa</strong><br>{{ cot.empresa or 'â€”' }}</div>
           <div class='row'><strong>Forma de pago</strong><br>{{ cot.forma_pago }}</div>
         </div>
 
@@ -2853,22 +2885,22 @@ PUBLIC_VIEW_TEMPLATE = """<!doctype html><html lang='es'><head>
         <div class='accept'>
           <form method='post' action='{{ accept_url }}'>
             <label style='font-weight:800'>Nombre de quien acepta (opcional)</label>
-            <input type='text' name='nombre' placeholder='Ej: Juan Pérez'>
+            <input type='text' name='nombre' placeholder='Ej: Juan PÃ©rez'>
             <div style='display:flex; gap:10px; align-items:center; margin-top:10px; flex-wrap:wrap'>
               <label style='display:flex; gap:8px; align-items:center'>
                 <input type='checkbox' name='ok' value='1' required>
-                Acepto esta cotización
+                Acepto esta cotizaciÃ³n
               </label>
               <button type='submit'>Aceptar</button>
             </div>
-            <div class='sub' style='margin-top:8px'>Al aceptar, se registra fecha y dirección IP.</div>
+            <div class='sub' style='margin-top:8px'>Al aceptar, se registra fecha y direcciÃ³n IP.</div>
           </form>
         </div>
         {% endif %}
 
         <div class='foot'>
-          <div>Garantía: {{ params.garantia }} · Vigencia: {{ params.vigencia_dias }} días · Plazo: {{ params.plazo_entrega }}</div>
-          <div><strong>RC DOMOTIC</strong> · {{ params.contacto }} · {{ params.email }}</div>
+          <div>GarantÃ­a: {{ params.garantia }} Â· Vigencia: {{ params.vigencia_dias }} dÃ­as Â· Plazo: {{ params.plazo_entrega }}</div>
+          <div><strong>RC DOMOTIC</strong> Â· {{ params.contacto }} Â· {{ params.email }}</div>
         </div>
       </div>
     </div>
@@ -2952,7 +2984,7 @@ def public_pdf(token):
     w, h = letter
     y = h - 40
     c.setFont("Helvetica-Bold", 14)
-    c.drawString(40, y, f"Cotización {cot.get('no_cotizacion','')}")
+    c.drawString(40, y, f"CotizaciÃ³n {cot.get('no_cotizacion','')}")
     y -= 18
     c.setFont("Helvetica", 10)
     c.drawString(40, y, f"Cliente: {cot.get('cliente','')}  |  Proyecto: {cot.get('proyecto','') or 'N/A'}")
@@ -3035,7 +3067,7 @@ def public_pdf(token):
     c.drawRightString(545, y, f"{int(tots.get('total_final',0)):,}".replace(',', '.'))
     y -= 18
     c.setFont("Helvetica", 9)
-    c.drawString(40, y, f"Garantía: {params.get('garantia','')} · Vigencia: {params.get('vigencia_dias','')} días · Plazo: {params.get('plazo_entrega','')}")
+    c.drawString(40, y, f"GarantÃ­a: {params.get('garantia','')} Â· Vigencia: {params.get('vigencia_dias','')} dÃ­as Â· Plazo: {params.get('plazo_entrega','')}")
     c.showPage(); c.save()
     buf.seek(0)
     filename = f"{cot.get('no_cotizacion','cotizacion')}.pdf"
@@ -3130,10 +3162,10 @@ def print_inventario():
     tbody tr:hover{background:rgba(37,211,102,.04)}
     @media print{body{margin:10px}th{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
     </style></head><body>
-    <h1>Inventario — """+bodega+"""</h1>
+    <h1>Inventario â€” """+bodega+"""</h1>
     <div class='sub'>Generado: """+datetime.datetime.now().strftime('%Y-%m-%d %H:%M')+"""</div>
     <table><thead><tr>
-      <th>Foto</th><th>ID</th><th>Producto</th><th>Categoría</th>
+      <th>Foto</th><th>ID</th><th>Producto</th><th>CategorÃ­a</th>
       <th>Stock</th><th>Min</th><th>Costo</th><th>Precio</th>
     </tr></thead><tbody>
     """
@@ -3146,7 +3178,7 @@ def print_inventario():
         if img:
             row += f"<td><div class='img'><img src='{img}'></div></td>"
         else:
-            row += "<td><div class='img'><span class='muted'>—</span></div></td>"
+            row += "<td><div class='img'><span class='muted'>â€”</span></div></td>"
         row += f"<td>{it['id_producto']}</td><td>{it['nombre']}</td><td>{it['categoria']}</td>"
         row += f"<td>{fm(it.get('stock_qty',0))}</td><td>{fm(it.get('stock_min',0))}</td>"
         row += f"<td>$ {fm(it.get('costo_unitario',0))}</td><td>$ {fm(it.get('precio',0))}</td></tr>"
@@ -3155,7 +3187,7 @@ def print_inventario():
     return html
 
 
-# ─── BOT API (Telegram Cotizador) ────────────────────────────────────────────
+# â”€â”€â”€ BOT API (Telegram Cotizador) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def _require_bot_key():
     if not BOT_KEYS:
@@ -3168,7 +3200,7 @@ def _require_bot_key():
 def _normalize_str(s):
     s = str(s or '').lower().strip()
     s = ''.join(ch for ch in unicodedata.normalize('NFKD', s) if not unicodedata.combining(ch))
-    for a, b in [('á','a'),('é','e'),('í','i'),('ó','o'),('ú','u'),('ñ','n'),('ü','u')]:
+    for a, b in [('Ã¡','a'),('Ã©','e'),('Ã­','i'),('Ã³','o'),('Ãº','u'),('Ã±','n'),('Ã¼','u')]:
         s = s.replace(a, b)
     s = re.sub(r'[^a-z0-9\s]', ' ', s)
     s = re.sub(r'\s+', ' ', s).strip()
@@ -3856,10 +3888,10 @@ def bot_agregar_item(cot_id):
     cant = max(1, int(d.get('cant') or 1))
     cot = query("SELECT * FROM cotizaciones WHERE id=?", (cot_id,), one=True)
     if not cot:
-        return jsonify({'ok': False, 'error': f'Cotización {cot_id} no encontrada.'})
+        return jsonify({'ok': False, 'error': f'CotizaciÃ³n {cot_id} no encontrada.'})
     prod = query("SELECT * FROM catalogo WHERE id_producto=? AND activo=1", (codigo,), one=True)
     if not prod:
-        return jsonify({'ok': False, 'error': f'Producto {codigo} no encontrado en catálogo.'})
+        return jsonify({'ok': False, 'error': f'Producto {codigo} no encontrado en catÃ¡logo.'})
     existing = query("SELECT * FROM items WHERE cot_id=? AND id_producto=?", (cot_id, codigo), one=True)
     if existing:
         execute("UPDATE items SET cantidad=cantidad+? WHERE id=?", (cant, existing['id']))
@@ -3868,11 +3900,11 @@ def bot_agregar_item(cot_id):
         execute("INSERT INTO items (cot_id,linea,id_producto,cantidad,precio_manual,inst_manual,cfg_manual,notas_item) VALUES (?,?,?,?,0,0,0,'')",
                 (cot_id, (ml['ml'] or 0) + 1, codigo, cant))
     return jsonify({'ok': True,
-                    'mensaje_telegram': f"✅ Agregado: {cant}x {prod['nombre']} a la cotización {cot['no_cotizacion']}."})
+                    'mensaje_telegram': f"âœ… Agregado: {cant}x {prod['nombre']} a la cotizaciÃ³n {cot['no_cotizacion']}."})
 
 @app.post('/api/bot/transcribir-audio')
 def bot_transcribir_audio():
-    """Recibe audio en base64 y transcribe vía OpenAI Whisper."""
+    """Recibe audio en base64 y transcribe vÃ­a OpenAI Whisper."""
     err = _require_bot_key()
     if err: return err
     openai_key = os.environ.get('OPENAI_API_KEY', '')
@@ -3885,7 +3917,7 @@ def bot_transcribir_audio():
     prompt = d.get('prompt') or ''
     model = d.get('model') or 'whisper-1'
     if not audio_b64:
-        return jsonify({'ok': False, 'error': 'audio_b64 vacío.'}), 400
+        return jsonify({'ok': False, 'error': 'audio_b64 vacÃ­o.'}), 400
     try:
         import base64 as _b64
         audio_bytes = _b64.b64decode(audio_b64)
@@ -3920,8 +3952,9 @@ def bot_transcribir_audio():
 if __name__ == '__main__':
     init_db()
     print("\n" + "="*50)
-    print("  🚀 RC DOMOTIC Cotizador v3.0")
+    print("  ðŸš€ RC DOMOTIC Cotizador v3.0")
     print("  http://localhost:5000")
     print("  Red local: http://0.0.0.0:5000")
     print("="*50 + "\n")
     app.run(debug=True, host='0.0.0.0', port=5000)
+
