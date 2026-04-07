@@ -1722,7 +1722,11 @@ async function loadCots(){
   let url='/api/cotizaciones?';if(q)url+=`q=${encodeURIComponent(q)}&`;if(e)url+=`estado=${e}&`;
   const cots=await api(url);
   const wrap=$('#cotsCards');
-  if(!cots || !cots.length){
+  if(cots && cots.ok===false){
+    wrap.innerHTML=`<p style="color:#b91c1c;font-size:12px">Error cargando cotizaciones: ${escapeHtml(cots.error||'desconocido')}</p>`;
+    return;
+  }
+  if(!Array.isArray(cots) || !cots.length){
     wrap.innerHTML='<p style="color:#999;font-size:12px">Sin cotizaciones.</p>';
     return;
   }
