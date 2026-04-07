@@ -1616,7 +1616,10 @@ def api_crm_actividades(cid):
 # Cotizaciones
 @app.get('/api/cotizaciones')
 def get_cotizaciones():
-    estado = request.args.get('estado'); busca = request.args.get('q', '')
+    estado = (request.args.get('estado') or '').strip()
+    if estado.lower() in ('todos', 'all', 'todas'):
+        estado = ''
+    busca = request.args.get('q', '')
     sql = "SELECT * FROM cotizaciones WHERE 1=1"; p = []
     if estado: sql += " AND estado=?"; p.append(estado)
     if busca:
