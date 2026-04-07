@@ -94,6 +94,16 @@ def snapshot_db(reason: str = 'manual'):
     out = os.path.join(BACKUP_DIR, f'rc_domotic_{safe_reason}_{ts}.db')
     shutil.copy2(DB_PATH, out)
     return out
+
+def _db_counts_from_file(path: str):
+    conn = sqlite3.connect(path)
+    try:
+        cur = conn.cursor()
+        c = cur.execute("SELECT COUNT(*) FROM cotizaciones").fetchone()[0]
+        i = cur.execute("SELECT COUNT(*) FROM items").fetchone()[0]
+        return int(c), int(i)
+    finally:
+        conn.close()
 # Rate limiting (si flask-limiter estÃ¡ disponible)
 limiter = None
 if Limiter and get_remote_address:
@@ -1981,6 +1991,70 @@ def api_db_backup():
         if not out:
             return jsonify({'ok': False, 'error': 'No existe base para respaldar'}), 404
         return jsonify({'ok': True, 'backup': os.path.basename(out), 'path': out})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+@app.get('/api/admin/db_scan')
+@role_required('admin')
+def api_db_scan():
+    try:
+        roots = []
+        for d in [DATA_DIR, BASE_DIR, '/var/data', '/tmp']:
+            if d and os.path.isdir(d):
+                roots.append(os.path.abspath(d))
+        seen = set()
+        found = []
+        for root in roots:
+            for dirpath, _, filenames in os.walk(root):
+                for fn in filenames:
+                    if not fn.lower().endswith('.db'):
+                        continue
+                    fp = os.path.abspath(os.path.join(dirpath, fn))
+                    if fp in seen:
+                        continue
+                    seen.add(fp)
+                    try:
+                        cot_count, item_count = _db_counts_from_file(fp)
+                    except Exception:
+                        continue
+                    found.append({
+                        'path': fp,
+                        'name': fn,
+                        'size': os.path.getsize(fp),
+                        'mtime': int(os.path.getmtime(fp)),
+                        'cotizaciones': cot_count,
+                        'items': item_count,
+                        'is_current': os.path.abspath(fp) == os.path.abspath(DB_PATH),
+                    })
+        found.sort(key=lambda x: (x['cotizaciones'], x['items'], x['mtime']), reverse=True)
+        return jsonify({'ok': True, 'current_db': DB_PATH, 'candidates': found[:100]})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+@app.post('/api/admin/db_restore')
+@role_required('admin')
+def api_db_restore():
+    try:
+        data = request.json or {}
+        src = os.path.abspath(str(data.get('path') or '').strip())
+        if not src or not os.path.isfile(src):
+            return jsonify({'ok': False, 'error': 'Archivo origen no existe'}), 404
+        # Permitir restaurar solo desde rutas locales esperadas
+        allowed_roots = [os.path.abspath(x) for x in [DATA_DIR, BASE_DIR, '/var/data', '/tmp'] if x and os.path.isdir(x)]
+        if not any(src.startswith(root + os.sep) or src == root for root in allowed_roots):
+            return jsonify({'ok': False, 'error': 'Ruta origen no permitida'}), 403
+        cot_count, item_count = _db_counts_from_file(src)
+        backup_prev = snapshot_db('pre_restore')
+        os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+        shutil.copy2(src, DB_PATH)
+        return jsonify({
+            'ok': True,
+            'restored_from': src,
+            'backup_previous': backup_prev,
+            'cotizaciones': cot_count,
+            'items': item_count,
+            'db_path': DB_PATH,
+        })
     except Exception as e:
         return jsonify({'ok': False, 'error': str(e)}), 500
 
