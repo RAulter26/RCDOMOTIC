@@ -557,7 +557,7 @@ PRODUCTOS = [
     ('CAM-005','CCTV','CÃ¡mara Lumios 2K WiFi 6','CÃ¡mara Lumios 1080P exterior foco WiFi','Und',280000,0,0,100000,0,'',1),
     ('CAM-006','CCTV','NVR 8 Canales WiFi','Sistema NVR grabaciÃ³n cÃ¡maras WiFi 8 canales','Und',1400000,0,0,0,200000,'',1),
     ('CAM-007','CCTV','NVR 12 Canales WiFi 6 2TB','Reolink NVR 12CH WiFi 6 disco 2TB 24/7','Und',1450000,0,0,0,200000,'',1),
-    ('CAM-008','CCTV','CÃ¡mara Web 4K OBSBOT','OBSBOT Tiny 2 Lite cÃ¡mara web 4K AI tracking','Und',889000,0,0,0,0,'',1),
+    ('CAM-008','CCTV','CÃ¡mara de doble lente de 180Â° de 8MP','CÃ¡maras de seguridad solar 4K inalÃ¡mbricas para exteriores, cÃ¡mara de doble lente de 180Â°','Und',889000,0,0,100000,50000,'/uploads/products/CAM-008_catalogo.png',1),
     ('RED-001','REDES','Deco BE3000 WiFi 7 Interior','TP-Link Deco BE3000 WiFi 7 unidad interior','Und',860000,0,0,50000,100000,'',1),
     ('RED-002','REDES','Deco x55 WiFi 7 M5','Deco x55 WiFi 7 M5 interior alta velocidad','Und',425000,0,0,50000,100000,'',1),
     ('RED-003','REDES','Deco WiFi 6 Doble Banda','Unidad extensora WiFi 6 doble banda mesh','Und',290000,0,0,50000,100000,'',1),
@@ -565,6 +565,7 @@ PRODUCTOS = [
     ('RED-005','REDES','Soporte Pared Deco Interior','Soporte pared para Decos internet interior','Und',180000,0,0,0,0,'',1),
     ('RED-006','REDES','Soporte Deco Interior (small)','Soporte pequeÃ±o para Decos internet interior','Und',75000,0,0,0,0,'',1),
     ('RED-007','REDES','Extensor Red Internet','Extensor de red internet WiFi','Und',75000,0,0,50000,0,'',1),
+    ('RED-008','REDES','Soporte para Antena Starlink','Starlink - Mini soporte para versiÃ³n 2025, adaptador redondo de aleaciÃ³n de aluminio ajustable de 360Â°','Und',938000,0,0,100000,50000,'/uploads/products/RED-008_catalogo.png',1),
     ('AV-001','AUDIOVISUAL','Amplificador WiiM','WiiM Amp multihabitaciÃ³n AirPlay Alexa','Und',2550000,0,0,0,150000,'',1),
     ('AV-002','AUDIOVISUAL','Amplificador WiiM Amp Ultra','WiiM Amp Ultra 100W voz AirPlay Spotify','Und',3150000,0,0,0,200000,'',1),
     ('AV-003','AUDIOVISUAL','Parlante Klipsch Empotrado','Parlante empotrado techo Klipsch 5.25"','Und',770000,0,0,150000,0,'',1),
@@ -608,6 +609,56 @@ PARAMS_DATA = [
     ('brand_primary', '#0F0F0F'),
     ('brand_surface', '#111111'),
     ('brand_accent', '#25D366'),]
+
+RECOVERY_GILBERTO_QUOTE = {
+    'no_cotizacion': 'A05-00060',
+    'fecha': '2026-04-06',
+    'created_at': '2026-04-06 04:45:00',
+    'vendedor': 'Admin',
+    'cliente': 'Sr. Gilberto',
+    'empresa': 'Finca',
+    'nit_cc': '0',
+    'telefono': '0',
+    'email_cliente': '',
+    'direccion': '',
+    'ciudad': '',
+    'proyecto': 'Finca',
+    'tipo_cotizacion': 'MIXTA',
+    'forma_pago': '70% - 30%',
+    'anticipo_pct': 0.70,
+    'anticipo_val_manual': 0,
+    'abonado_val': 0,
+    'descuento_pct': 0,
+    'descuento_val': 0,
+    'notas': '',
+    'notas_internas': '',
+    'checklist_json': json.dumps([
+        {"label":"Visita técnica", "done": False},
+        {"label":"Medidas confirmadas", "done": False},
+        {"label":"Cliente aprueba equipos", "done": False},
+        {"label":"Anticipo recibido", "done": False},
+        {"label":"Programación agenda", "done": False},
+        {"label":"Instalación completa", "done": False},
+        {"label":"Entrega y capacitación", "done": False},
+    ], ensure_ascii=False),
+    'price_list_code': 'PUBLICO',
+    'price_list_desc_pct': 0.0,
+    'public_token': '',
+    'public_expires_at': '',
+    'public_revoked': 0,
+    'accepted': 0,
+    'accepted_at': '',
+    'accepted_name': '',
+    'accepted_ip': '',
+    'estado': 'BORRADOR',
+    'etapa': 'COTIZADA',
+    'items': [
+        {'linea': 1, 'id_producto': 'CAM-008', 'cantidad': 1, 'precio_manual': 1550000, 'inst_manual': 200000, 'cfg_manual': 50000, 'notas_item': ''},
+        {'linea': 2, 'id_producto': 'RED-005', 'cantidad': 1, 'precio_manual': 98000,  'inst_manual': 80000,  'cfg_manual': 50000, 'notas_item': ''},
+        {'linea': 3, 'id_producto': 'RED-002', 'cantidad': 2, 'precio_manual': 425000, 'inst_manual': 150000, 'cfg_manual': 50000, 'notas_item': ''},
+        {'linea': 4, 'id_producto': 'RED-008', 'cantidad': 1, 'precio_manual': 165000, 'inst_manual': 60000,  'cfg_manual': 50000, 'notas_item': ''},
+    ],
+}
 
 def init_db():
     fresh = not os.path.exists(DB_PATH)
@@ -742,8 +793,65 @@ def init_db():
         pass
     # Si hay archivos locales en uploads/products, asegura imagen_url en catalogo.
     _sync_catalog_images_from_uploads(conn)
+    # Rescate de la cotización A05-00060 de Sr. Gilberto si la base quedó vacía o la perdió.
+    try:
+        _seed_gilberto_quote(conn)
+    except Exception as e:
+        print("[WARN] No se pudo sembrar la cotización de rescate:", e)
+    _sync_cotizacion_consecutivo(conn)
     conn.commit()
     conn.close()
+
+def _sync_cotizacion_consecutivo(conn):
+    try:
+        rows = conn.execute("SELECT no_cotizacion FROM cotizaciones").fetchall()
+        max_seq = 0
+        for (no_cot,) in rows:
+            m = re.search(r'-(\d+)$', str(no_cot or '').strip())
+            if m:
+                max_seq = max(max_seq, int(m.group(1)))
+        if max_seq <= 0:
+            return
+        current = conn.execute("SELECT valor FROM parametros WHERE clave='consecutivo'").fetchone()
+        cur_seq = int(current[0]) if current and str(current[0]).strip().isdigit() else 0
+        if cur_seq <= max_seq:
+            conn.execute("UPDATE parametros SET valor=? WHERE clave='consecutivo'", (str(max_seq + 1),))
+    except Exception as e:
+        print("[WARN] No se pudo sincronizar consecutivo de cotizaciones:", e)
+
+def _seed_gilberto_quote(conn):
+    exists = conn.execute(
+        "SELECT id FROM cotizaciones WHERE no_cotizacion=?",
+        (RECOVERY_GILBERTO_QUOTE['no_cotizacion'],)
+    ).fetchone()
+    if exists:
+        return
+
+    fields = [
+        'no_cotizacion', 'fecha', 'vendedor', 'cliente', 'empresa', 'nit_cc',
+        'telefono', 'email_cliente', 'direccion', 'ciudad', 'proyecto',
+        'tipo_cotizacion', 'forma_pago', 'anticipo_pct', 'anticipo_val_manual',
+        'abonado_val', 'descuento_pct', 'descuento_val', 'notas', 'notas_internas',
+        'checklist_json', 'price_list_code', 'price_list_desc_pct', 'public_token',
+        'public_expires_at', 'public_revoked', 'accepted', 'accepted_at',
+        'accepted_name', 'accepted_ip', 'estado', 'created_at', 'etapa'
+    ]
+    values = [RECOVERY_GILBERTO_QUOTE.get(f, '') for f in fields]
+    conn.execute(
+        f"INSERT INTO cotizaciones ({','.join(fields)}) VALUES ({','.join(['?'] * len(fields))})",
+        values,
+    )
+    cot_id = conn.execute("SELECT id FROM cotizaciones WHERE no_cotizacion=?", (RECOVERY_GILBERTO_QUOTE['no_cotizacion'],)).fetchone()[0]
+    for item in RECOVERY_GILBERTO_QUOTE['items']:
+        conn.execute(
+            """INSERT INTO items (cot_id,linea,id_producto,cantidad,precio_manual,inst_manual,cfg_manual,notas_item)
+               VALUES (?,?,?,?,?,?,?,?)""",
+            (cot_id, item['linea'], item['id_producto'], item['cantidad'],
+             item['precio_manual'], item['inst_manual'], item['cfg_manual'], item.get('notas_item', ''))
+        )
+    # El siguiente consecutivo debe ser mayor al número rescatado.
+    conn.execute("INSERT OR REPLACE INTO parametros (clave, valor) VALUES ('consecutivo', ?)", ('61',))
+    print("  ✓ Cotización de rescate A05-00060 sembrada")
 
 # â”€â”€â”€ CÃLCULOS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 def calcular_item(item, prod, price_list_desc_pct: float = 0.0):
