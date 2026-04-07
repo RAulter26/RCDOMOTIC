@@ -3,7 +3,7 @@ Flask + SQLite3 | Sin dependencias de nube | Funciona en local o servidor
 v3: Fix Excel, Selector categorÃ­as, Merge duplicados, Logo+Watermark PDF,
     Dashboard APROBADA, CatÃ¡logo Pro, Comandos seguros
 """
-import sqlite3, os, json, datetime, re, uuid, traceback, secrets, time, ipaddress, socket, unicodedata
+import sqlite3, os, json, datetime, re, uuid, traceback, secrets, time, ipaddress, socket, unicodedata, shutil
 from functools import wraps
 from flask import (Flask, request, jsonify, g, send_file, session,
                    render_template_string, send_from_directory, abort)
@@ -51,11 +51,49 @@ app.config.update(
 # LÃ­mite de carga (uploads)
 app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH  = os.path.join(BASE_DIR, 'rc_domotic.db')
-UPLOAD_FOLDER     = os.path.join(BASE_DIR, 'uploads', 'products')
+_DATA_DIR_ENV = (os.environ.get('DATA_DIR') or '').strip()
+_RENDER_DATA_DIR = '/var/data'
+if _DATA_DIR_ENV:
+    DATA_DIR = _DATA_DIR_ENV
+elif os.path.isdir(_RENDER_DATA_DIR):
+    DATA_DIR = _RENDER_DATA_DIR
+else:
+    DATA_DIR = BASE_DIR
+DB_PATH = os.environ.get('DB_PATH', os.path.join(DATA_DIR, 'rc_domotic.db'))
+UPLOADS_DIR = os.environ.get('UPLOADS_DIR', os.path.join(DATA_DIR, 'uploads'))
+UPLOAD_FOLDER = os.path.join(UPLOADS_DIR, 'products')
+BACKUP_DIR = os.environ.get('BACKUP_DIR', os.path.join(DATA_DIR, 'backups'))
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp'}
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+os.makedirs(BACKUP_DIR, exist_ok=True)
+
+def _maybe_migrate_legacy_db():
+    """Si cambió DB_PATH a ruta persistente, copia la BD legacy una sola vez."""
+    try:
+        legacy = os.path.join(BASE_DIR, 'rc_domotic.db')
+        if os.path.abspath(legacy) == os.path.abspath(DB_PATH):
+            return
+        if os.path.isfile(DB_PATH):
+            return
+        if os.path.isfile(legacy):
+            os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+            shutil.copy2(legacy, DB_PATH)
+            print(f"[DB] Migrada BD legacy -> {DB_PATH}")
+    except Exception as e:
+        print("[WARN] No se pudo migrar BD legacy:", e)
+
+_maybe_migrate_legacy_db()
+
+def snapshot_db(reason: str = 'manual'):
+    """Crea copia de seguridad sqlite en BACKUP_DIR."""
+    if not os.path.isfile(DB_PATH):
+        return None
+    ts = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+    safe_reason = re.sub(r'[^a-zA-Z0-9_-]+', '_', reason or 'manual').strip('_') or 'manual'
+    out = os.path.join(BACKUP_DIR, f'rc_domotic_{safe_reason}_{ts}.db')
+    shutil.copy2(DB_PATH, out)
+    return out
 # Rate limiting (si flask-limiter estÃ¡ disponible)
 limiter = None
 if Limiter and get_remote_address:
@@ -225,6 +263,7 @@ def ensure_db_ready():
         return
     try:
         init_db()
+        print(f"[DB] Usando base: {DB_PATH}")
         _DB_INIT_DONE = True
     except Exception as e:
         # No tumbar el proceso; las rutas devolverÃ¡n error controlado.
@@ -1842,6 +1881,10 @@ def update_cotizacion(cot_id):
 def delete_cotizacion(cot_id):
     if not query("SELECT id FROM cotizaciones WHERE id=?", (cot_id,), one=True):
         return jsonify({'ok': False, 'error': 'No encontrada'}), 404
+    try:
+        snapshot_db(f'before_delete_cot_{cot_id}')
+    except Exception:
+        pass
     execute("DELETE FROM cotizaciones WHERE id=?", (cot_id,))
     return jsonify({'ok': True})
 
@@ -1895,6 +1938,48 @@ def delete_item(item_id):
 @role_required('admin')
 def get_parametros():
     return jsonify({r['clave']: r['valor'] for r in query("SELECT * FROM parametros")})
+
+@app.get('/api/admin/db_status')
+@role_required('admin')
+def api_db_status():
+    try:
+        cot_count = query("SELECT COUNT(*) as n FROM cotizaciones", one=True)['n']
+        item_count = query("SELECT COUNT(*) as n FROM items", one=True)['n']
+        backups = []
+        if os.path.isdir(BACKUP_DIR):
+            files = []
+            for fn in os.listdir(BACKUP_DIR):
+                fp = os.path.join(BACKUP_DIR, fn)
+                if os.path.isfile(fp) and fn.lower().endswith('.db'):
+                    files.append((os.path.getmtime(fp), fn, os.path.getsize(fp)))
+            files.sort(reverse=True)
+            backups = [{'name': fn, 'size': sz, 'mtime': int(mt)} for mt, fn, sz in files[:20]]
+        return jsonify({
+            'ok': True,
+            'base_dir': BASE_DIR,
+            'data_dir': DATA_DIR,
+            'db_path': DB_PATH,
+            'uploads_dir': UPLOAD_FOLDER,
+            'backup_dir': BACKUP_DIR,
+            'db_exists': os.path.isfile(DB_PATH),
+            'db_size': os.path.getsize(DB_PATH) if os.path.isfile(DB_PATH) else 0,
+            'cotizaciones': cot_count,
+            'items': item_count,
+            'backups': backups,
+        })
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+@app.post('/api/admin/db_backup')
+@role_required('admin')
+def api_db_backup():
+    try:
+        out = snapshot_db('admin')
+        if not out:
+            return jsonify({'ok': False, 'error': 'No existe base para respaldar'}), 404
+        return jsonify({'ok': True, 'backup': os.path.basename(out), 'path': out})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
 
 @app.put('/api/parametros')
 @role_required('admin')
