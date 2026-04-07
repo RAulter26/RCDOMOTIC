@@ -557,15 +557,15 @@ PRODUCTOS = [
     ('CAM-005','CCTV','CÃ¡mara Lumios 2K WiFi 6','CÃ¡mara Lumios 1080P exterior foco WiFi','Und',280000,0,0,100000,0,'',1),
     ('CAM-006','CCTV','NVR 8 Canales WiFi','Sistema NVR grabaciÃ³n cÃ¡maras WiFi 8 canales','Und',1400000,0,0,0,200000,'',1),
     ('CAM-007','CCTV','NVR 12 Canales WiFi 6 2TB','Reolink NVR 12CH WiFi 6 disco 2TB 24/7','Und',1450000,0,0,0,200000,'',1),
-    ('CAM-008','CCTV','CÃ¡mara de doble lente de 180Â° de 8MP','CÃ¡maras de seguridad solar 4K inalÃ¡mbricas para exteriores, cÃ¡mara de doble lente de 180Â°','Und',889000,0,0,100000,50000,'/uploads/products/CAM-008_catalogo.png',1),
+    ('CAM-008','CCTV','CÃ¡mara de doble lente de 180Â° de 8MP','CÃ¡maras de seguridad solar 4K inalÃ¡mbricas para exteriores, cÃ¡mara de doble lente de 180Â°','Und',889000,0,0,100000,50000,'https://m.media-amazon.com/images/I/615MkukhHIL._AC_UY218_.jpg',1),
     ('RED-001','REDES','Deco BE3000 WiFi 7 Interior','TP-Link Deco BE3000 WiFi 7 unidad interior','Und',860000,0,0,50000,100000,'',1),
-    ('RED-002','REDES','Deco x55 WiFi 7 M5','Deco x55 WiFi 7 M5 interior alta velocidad','Und',425000,0,0,50000,100000,'',1),
+    ('RED-002','REDES','Deco x55 WiFi 7 M5','Deco x55 WiFi 7 M5 interior alta velocidad','Und',425000,0,0,50000,100000,'https://m.media-amazon.com/images/I/61D7vtclcsL._AC_UY218_.jpg',1),
     ('RED-003','REDES','Deco WiFi 6 Doble Banda','Unidad extensora WiFi 6 doble banda mesh','Und',290000,0,0,50000,100000,'',1),
     ('RED-004','REDES','Switch Internet','Switch de red ethernet 8 puertos','Und',140000,0,0,50000,0,'',1),
-    ('RED-005','REDES','Soporte Pared Deco Interior','Soporte pared para Decos internet interior','Und',180000,0,0,0,0,'',1),
+    ('RED-005','REDES','Soporte Pared Deco Interior','Soporte pared para Decos internet interior','Und',180000,0,0,0,0,'https://m.media-amazon.com/images/I/313fppQuz6L._AC_SR250,250_QL65_.jpg',1),
     ('RED-006','REDES','Soporte Deco Interior (small)','Soporte pequeÃ±o para Decos internet interior','Und',75000,0,0,0,0,'',1),
     ('RED-007','REDES','Extensor Red Internet','Extensor de red internet WiFi','Und',75000,0,0,50000,0,'',1),
-    ('RED-008','REDES','Soporte para Antena Starlink','Starlink - Mini soporte para versiÃ³n 2025, adaptador redondo de aleaciÃ³n de aluminio ajustable de 360Â°','Und',938000,0,0,100000,50000,'/uploads/products/RED-008_catalogo.png',1),
+    ('RED-008','REDES','Soporte para Antena Starlink','Starlink - Mini soporte para versiÃ³n 2025, adaptador redondo de aleaciÃ³n de aluminio ajustable de 360Â°','Und',938000,0,0,100000,50000,'https://m.media-amazon.com/images/I/41qa9-id8tL._AC_SR250,250_QL65_.jpg',1),
     ('AV-001','AUDIOVISUAL','Amplificador WiiM','WiiM Amp multihabitaciÃ³n AirPlay Alexa','Und',2550000,0,0,0,150000,'',1),
     ('AV-002','AUDIOVISUAL','Amplificador WiiM Amp Ultra','WiiM Amp Ultra 100W voz AirPlay Spotify','Und',3150000,0,0,0,200000,'',1),
     ('AV-003','AUDIOVISUAL','Parlante Klipsch Empotrado','Parlante empotrado techo Klipsch 5.25"','Und',770000,0,0,150000,0,'',1),
@@ -793,6 +793,7 @@ def init_db():
         pass
     # Si hay archivos locales en uploads/products, asegura imagen_url en catalogo.
     _sync_catalog_images_from_uploads(conn)
+    _sync_amazon_catalog_images(conn)
     # Rescate de la cotización A05-00060 de Sr. Gilberto si la base quedó vacía o la perdió.
     try:
         _seed_gilberto_quote(conn)
@@ -1151,6 +1152,36 @@ def _sync_catalog_images_from_uploads(conn):
     except Exception as e:
         print("[WARN] No se pudo sincronizar imagenes de catalogo:", e)
         return 0
+
+def _sync_amazon_catalog_images(conn):
+    """
+    Rellena con fotos Amazon solo los productos que estamos corrigiendo
+    en esta tanda. No toca precios, nombres ni otras columnas.
+    """
+    overrides = {
+        'CAM-008': 'https://m.media-amazon.com/images/I/615MkukhHIL._AC_UY218_.jpg',
+        'RED-002': 'https://m.media-amazon.com/images/I/61D7vtclcsL._AC_UY218_.jpg',
+        'RED-005': 'https://m.media-amazon.com/images/I/313fppQuz6L._AC_SR250,250_QL65_.jpg',
+        'RED-008': 'https://m.media-amazon.com/images/I/41qa9-id8tL._AC_SR250,250_QL65_.jpg',
+    }
+    try:
+        updates = 0
+        for pid, url in overrides.items():
+            current = conn.execute("SELECT imagen_url FROM catalogo WHERE id_producto=?", (pid,)).fetchone()
+            if not current:
+                continue
+            cur_url = str(current[0] or '').strip()
+            if cur_url != url:
+                conn.execute("UPDATE catalogo SET imagen_url=? WHERE id_producto=?", (url, pid))
+                updates += 1
+        if updates:
+            conn.commit()
+            print(f"IMG_SYNC: {updates} imagenes Amazon aplicadas")
+        return updates
+    except Exception as e:
+        print("[WARN] No se pudo aplicar fotos Amazon:", e)
+        return 0
+
 @app.route('/uploads/products/<path:filename>')
 def serve_upload(filename):
     return send_from_directory(UPLOAD_FOLDER, filename)
