@@ -159,6 +159,44 @@ def role_required(*roles):
         return _wrap
     return deco
 
+_MOJIBAKE_HINTS = ('Ã', 'Â', 'â', 'ð', '\ufffd')
+
+def _mojibake_score(text: str) -> int:
+    return sum(text.count(h) for h in _MOJIBAKE_HINTS)
+
+def _repair_mojibake_text(value: str) -> str:
+    """Best-effort repair for mojibake strings (UTF-8 seen as latin-1/cp1252)."""
+    if not isinstance(value, str) or not value:
+        return value
+    current = value
+    for _ in range(2):
+        if _mojibake_score(current) == 0:
+            break
+        candidate = None
+        for enc in ('latin-1', 'cp1252'):
+            try:
+                fixed = current.encode(enc).decode('utf-8')
+            except Exception:
+                continue
+            if fixed != current and _mojibake_score(fixed) < _mojibake_score(current):
+                candidate = fixed
+                break
+        if not candidate:
+            break
+        current = candidate
+    return current
+
+def _repair_mojibake_obj(value):
+    if isinstance(value, str):
+        return _repair_mojibake_text(value)
+    if isinstance(value, list):
+        return [_repair_mojibake_obj(v) for v in value]
+    if isinstance(value, tuple):
+        return tuple(_repair_mojibake_obj(v) for v in value)
+    if isinstance(value, dict):
+        return {k: _repair_mojibake_obj(v) for k, v in value.items()}
+    return value
+
 # â”€â”€â”€ Imagen utils (fondo transparente simple: blanco -> alpha) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 def _remove_white_bg_to_png(src_path: str, dst_path: str, thr: int = 245):
     """Convierte fondo blanco/casi blanco a transparente.
@@ -209,7 +247,9 @@ def close_db(e=None):
 def query(sql, params=(), one=False):
     cur = get_db().execute(sql, params)
     rv = cur.fetchone() if one else cur.fetchall()
-    return (dict(rv) if rv else None) if one else [dict(r) for r in rv]
+    if one:
+        return _repair_mojibake_obj(dict(rv)) if rv else None
+    return [_repair_mojibake_obj(dict(r)) for r in rv]
 
 def execute(sql, params=()):
     db = get_db()
@@ -506,13 +546,13 @@ PARAMS_DATA = [
     ('empresa','RC DOMOTIC'),('nit','1102809561'),
     ('direccion','Calle 31-8-88'),('ciudad','Sincelejo / Sucre'),
     ('telefono','3123042156'),('email',''),('web',''),
-    ('contacto','RAÃšL CUELLO'),('banco','Bancolombia Ahorros'),
+    ('contacto','RAUL CUELLO'),('banco','Bancolombia Ahorros'),
     ('cuenta','506-826941-20'),('titular','RAUL CUELLO GONZALEZ'),
     ('iva_general','0.19'),('vigencia_dias','30'),
     ('forma_pago_default','70% - 30%'),('anticipo_default','0.70'),
     ('prefijo_cot','A05'),('consecutivo','60'),
-    ('garantia','6 meses en mano de obra / segÃºn fabricante en equipos'),
-    ('plazo_entrega','A convenir segÃºn proyecto'),
+    ('garantia','6 meses en mano de obra / segun fabricante en equipos'),
+    ('plazo_entrega','A convenir segun proyecto'),
     ('condiciones','Precios en COP incluyen equipos. La mano de obra se detalla por separado.'),
     ('logo_path', '/static/brand_logo.png'),
     ('watermark_path', '/static/watermark.png'),
@@ -530,8 +570,14 @@ def init_db():
     admin_pass = _ap_env or 'admin123'
     must_change_admin = 1 if (_ap_env is None or admin_pass == 'admin123') else 0
     if fresh:
-        conn.executemany("INSERT OR IGNORE INTO catalogo (id_producto,categoria,nombre,descripcion,unidad,precio,aplica_iva,pct_iva,inst_default,config_default,imagen_url,activo) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)", PRODUCTOS)
-        conn.executemany("INSERT OR IGNORE INTO parametros (clave, valor) VALUES (?,?)", PARAMS_DATA)
+        conn.executemany(
+            "INSERT OR IGNORE INTO catalogo (id_producto,categoria,nombre,descripcion,unidad,precio,aplica_iva,pct_iva,inst_default,config_default,imagen_url,activo) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+            [_repair_mojibake_obj(p) for p in PRODUCTOS]
+        )
+        conn.executemany(
+            "INSERT OR IGNORE INTO parametros (clave, valor) VALUES (?,?)",
+            [_repair_mojibake_obj(p) for p in PARAMS_DATA]
+        )
         # En BD fresca: crear admin
         try:
             conn.execute("INSERT OR IGNORE INTO users(username,password_hash,role,must_change_password) VALUES (?,?,?,?)",
@@ -760,9 +806,9 @@ def preparar_presentacion_cotizacion(items):
 
     service_items = []
     if round(inst_total, 0) > 0:
-        service_items.append({'label': 'InstalaciÃ³n total', 'total': round(inst_total, 0)})
+        service_items.append({'label': 'Instalacion total', 'total': round(inst_total, 0)})
     if round(cfg_total, 0) > 0:
-        service_items.append({'label': 'ConfiguraciÃ³n total', 'total': round(cfg_total, 0)})
+        service_items.append({'label': 'Configuracion total', 'total': round(cfg_total, 0)})
 
     return {
         'items': display_items,
@@ -2595,7 +2641,7 @@ def export_excel(cot_id):
 # â”€â”€â”€ PDF / Print â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 PRINT_TEMPLATE = """<!DOCTYPE html>
 <html lang="es"><head><meta charset="UTF-8">
-<title>CotizaciÃ³n {{ cot.no_cotizacion }}</title>
+<title>Cotizacion {{ cot.no_cotizacion }}</title>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:'Segoe UI',Arial,sans-serif;font-size:12px;color:#111;padding:20px;position:relative}
@@ -2644,18 +2690,18 @@ PRINT_TEMPLATE = """<!DOCTYPE html>
 <div class="content">
 <div class="no-print" style="margin-bottom:16px">
   <button onclick="window.print()" style="background:{{ accent_soft }};color:{{ accent_soft_text }};border:none;padding:8px 20px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600">Imprimir / Guardar PDF</button>
-  <button onclick="window.close()" style="background:#666;color:#fff;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;margin-left:8px">âœ• Cerrar</button>
+  <button onclick="window.close()" style="background:#666;color:#fff;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;margin-left:8px">&times; Cerrar</button>
 </div>
 <div class="cover">
   <div class="left">
     {% if logo_exists %}<img class="logo" src="{{ logo_url }}" alt="Logo">{% endif %}
     <div>
       <div class="title">{{ params.empresa or 'RC DOMOTIC' }}</div>
-      <div class="sub">{{ params.ciudad }} Â· {{ params.direccion }}<br>Tel: {{ params.telefono }} Â· {{ params.email }}</div>
+      <div class="sub">{{ params.ciudad }} &middot; {{ params.direccion }}<br>Tel: {{ params.telefono }} &middot; {{ params.email }}</div>
     </div>
   </div>
   <div class="box">
-    <div class="meta">COTIZACIÃ“N</div>
+    <div class="meta">COTIZACION</div>
     <div class="num">{{ cot.no_cotizacion }}</div>
     <div class="meta">Fecha: {{ cot.fecha }}</div>
   </div>
@@ -2664,12 +2710,12 @@ PRINT_TEMPLATE = """<!DOCTYPE html>
 <div class="section-title">DATOS DEL CLIENTE</div>
 <div class="info-grid">
   <div class="info-row"><span class="info-label">Cliente:</span> <strong>{{ cot.cliente }}</strong></div>
-  <div class="info-row"><span class="info-label">Proyecto:</span> {{ cot.proyecto or 'â€”' }}</div>
-  <div class="info-row"><span class="info-label">Empresa:</span> {{ cot.empresa or 'â€”' }}</div>
-  <div class="info-row"><span class="info-label">Ciudad:</span> {{ cot.ciudad or 'â€”' }}</div>
-  <div class="info-row"><span class="info-label">NIT/CC:</span> {{ cot.nit_cc or 'â€”' }}</div>
+  <div class="info-row"><span class="info-label">Proyecto:</span> {{ cot.proyecto or 'N/A' }}</div>
+  <div class="info-row"><span class="info-label">Empresa:</span> {{ cot.empresa or 'N/A' }}</div>
+  <div class="info-row"><span class="info-label">Ciudad:</span> {{ cot.ciudad or 'N/A' }}</div>
+  <div class="info-row"><span class="info-label">NIT/CC:</span> {{ cot.nit_cc or 'N/A' }}</div>
   <div class="info-row"><span class="info-label">Tipo:</span> {{ cot.tipo_cotizacion }}</div>
-  <div class="info-row"><span class="info-label">TelÃ©fono:</span> {{ cot.telefono or 'â€”' }}</div>
+  <div class="info-row"><span class="info-label">Telefono:</span> {{ cot.telefono or 'N/A' }}</div>
   <div class="info-row"><span class="info-label">Forma pago:</span> {{ cot.forma_pago }}</div>
 </div>
 <div class="section-title">DETALLE DE PRODUCTOS</div>
@@ -2717,8 +2763,8 @@ PRINT_TEMPLATE = """<!DOCTYPE html>
 </table></div><div style="clear:both"></div>
 {% if cot.notas %}<div style="margin-top:10px;padding:7px 10px;background:#f5f5f5;border-left:3px solid {{ accent_soft }};font-size:11px"><strong>Notas:</strong> {{ cot.notas }}</div>{% endif %}
 <div class="sign"><div class="sign-line">Firma Cliente<br>{{ cot.cliente }}</div><div class="sign-line">RC DOMOTIC<br>{{ params.contacto }}</div></div>
-<div class="footer"><div>âœ” GarantÃ­a: {{ params.garantia }}<br>âœ” Vigencia: {{ params.vigencia_dias }} dÃ­as Â· âœ” Plazo: {{ params.plazo_entrega }}</div>
-<div style="text-align:right">Consignaciones: {{ params.banco }}<br>Cta. {{ params.cuenta }} Â· {{ params.titular }}<br>CC {{ params.nit }}</div></div>
+<div class="footer"><div>&#10003; Garantia: {{ params.garantia }}<br>&#10003; Vigencia: {{ params.vigencia_dias }} dias &middot; &#10003; Plazo: {{ params.plazo_entrega }}</div>
+<div style="text-align:right">Consignaciones: {{ params.banco }}<br>Cta. {{ params.cuenta }} &middot; {{ params.titular }}<br>CC {{ params.nit }}</div></div>
 </div></body></html>"""
 
 @app.get('/print/<int:cot_id>')
@@ -2726,6 +2772,7 @@ PRINT_TEMPLATE = """<!DOCTYPE html>
 def print_cotizacion(cot_id):
     cot = query("SELECT * FROM cotizaciones WHERE id=?", (cot_id,), one=True)
     if not cot: return "Not found", 404
+    cot = _repair_mojibake_obj(cot)
     pl = float(cot.get('price_list_desc_pct') or 0)
     items_raw = query("""SELECT i.*, c.nombre, c.descripcion, c.unidad, c.precio,
                          c.aplica_iva, c.pct_iva, c.inst_default, c.config_default, c.imagen_url, c.categoria
@@ -2733,12 +2780,12 @@ def print_cotizacion(cot_id):
                          WHERE i.cot_id=? ORDER BY i.linea""", (cot_id,))
     items = []
     for it in items_raw:
-        items.append({**it, **calcular_item(it, it, pl)})
-    presentation = preparar_presentacion_cotizacion(items)
+        items.append(_repair_mojibake_obj({**it, **calcular_item(it, it, pl)}))
+    presentation = _repair_mojibake_obj(preparar_presentacion_cotizacion(items))
     grouped_items = presentation['grouped_items']
     service_items = presentation['service_items']
-    tots = calcular_cotizacion(cot_id)
-    params = {r['clave']: r['valor'] for r in query("SELECT * FROM parametros")}
+    tots = _repair_mojibake_obj(calcular_cotizacion(cot_id))
+    params = _repair_mojibake_obj({r['clave']: r['valor'] for r in query("SELECT * FROM parametros")})
     lp = params.get('logo_path','/static/brand_logo.png')
     wp = params.get('watermark_path','/static/watermark.png')
     le = os.path.isfile(os.path.join(BASE_DIR, lp.lstrip('/')))
@@ -2757,7 +2804,7 @@ def print_cotizacion(cot_id):
 # â”€â”€â”€ Vista pÃºblica sin login + aceptaciÃ³n â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 PUBLIC_VIEW_TEMPLATE = """<!doctype html><html lang='es'><head>
 <meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1'>
-<title>CotizaciÃ³n {{ cot.no_cotizacion }} - RC DOMOTIC</title>
+<title>Cotizacion {{ cot.no_cotizacion }} - RC DOMOTIC</title>
 <style>
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
   body{font-family:system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; margin:0; background:#f0f2f5; color:#1a1d21; line-height:1.6; -webkit-font-smoothing:antialiased}
@@ -2802,24 +2849,24 @@ PUBLIC_VIEW_TEMPLATE = """<!doctype html><html lang='es'><head>
       <div class='top'>
         <div class='logo'>RC</div>
         <div class='grow'>
-          <p class='h1'>CotizaciÃ³n {{ cot.no_cotizacion }}</p>
-          <div class='sub'>{{ cot.fecha }} Â· {{ cot.cliente }} Â· {{ cot.proyecto or 'N/A' }}</div>
+          <p class='h1'>Cotizacion {{ cot.no_cotizacion }}</p>
+          <div class='sub'>{{ cot.fecha }} &middot; {{ cot.cliente }} &middot; {{ cot.proyecto or 'N/A' }}</div>
         </div>
         <a class='btn' href='{{ pdf_url }}' target='_blank'>Descargar PDF</a>
       </div>
       <div class='content'>
         <div style='display:flex; gap:10px; align-items:center; flex-wrap:wrap;'>
           {% if cot.accepted %}
-            <span class='stamp ok'>ACEPTADA âœ“</span>
-            <span class='sub'>{{ cot.accepted_name or cot.cliente }} Â· {{ cot.accepted_at }}</span>
+            <span class='stamp ok'>ACEPTADA &#10003;</span>
+            <span class='sub'>{{ cot.accepted_name or cot.cliente }} &middot; {{ cot.accepted_at }}</span>
           {% else %}
-            <span class='stamp warn'>PENDIENTE DE ACEPTACIÃ“N</span>
+            <span class='stamp warn'>PENDIENTE DE ACEPTACION</span>
           {% endif %}
         </div>
         <div class='grid' style='margin-top:12px'>
           <div class='row'><strong>Cliente</strong><br>{{ cot.cliente }}</div>
-          <div class='row'><strong>TelÃ©fono</strong><br>{{ cot.telefono or 'â€”' }}</div>
-          <div class='row'><strong>Empresa</strong><br>{{ cot.empresa or 'â€”' }}</div>
+          <div class='row'><strong>Telefono</strong><br>{{ cot.telefono or 'N/A' }}</div>
+          <div class='row'><strong>Empresa</strong><br>{{ cot.empresa or 'N/A' }}</div>
           <div class='row'><strong>Forma de pago</strong><br>{{ cot.forma_pago }}</div>
         </div>
 
@@ -2885,22 +2932,22 @@ PUBLIC_VIEW_TEMPLATE = """<!doctype html><html lang='es'><head>
         <div class='accept'>
           <form method='post' action='{{ accept_url }}'>
             <label style='font-weight:800'>Nombre de quien acepta (opcional)</label>
-            <input type='text' name='nombre' placeholder='Ej: Juan PÃ©rez'>
+            <input type='text' name='nombre' placeholder='Ej: Juan Perez'>
             <div style='display:flex; gap:10px; align-items:center; margin-top:10px; flex-wrap:wrap'>
               <label style='display:flex; gap:8px; align-items:center'>
                 <input type='checkbox' name='ok' value='1' required>
-                Acepto esta cotizaciÃ³n
+                Acepto esta cotizacion
               </label>
               <button type='submit'>Aceptar</button>
             </div>
-            <div class='sub' style='margin-top:8px'>Al aceptar, se registra fecha y direcciÃ³n IP.</div>
+            <div class='sub' style='margin-top:8px'>Al aceptar, se registra fecha y direccion IP.</div>
           </form>
         </div>
         {% endif %}
 
         <div class='foot'>
-          <div>GarantÃ­a: {{ params.garantia }} Â· Vigencia: {{ params.vigencia_dias }} dÃ­as Â· Plazo: {{ params.plazo_entrega }}</div>
-          <div><strong>RC DOMOTIC</strong> Â· {{ params.contacto }} Â· {{ params.email }}</div>
+          <div>Garantia: {{ params.garantia }} &middot; Vigencia: {{ params.vigencia_dias }} dias &middot; Plazo: {{ params.plazo_entrega }}</div>
+          <div><strong>RC DOMOTIC</strong> &middot; {{ params.contacto }} &middot; {{ params.email }}</div>
         </div>
       </div>
     </div>
@@ -2928,17 +2975,18 @@ def _get_cot_by_token(token:str):
 def public_view(token):
     cot = _get_cot_by_token(token)
     if not cot: return "Not found", 404
+    cot = _repair_mojibake_obj(cot)
     pl = float(cot.get('price_list_desc_pct') or 0)
     items_raw = query("""SELECT i.*, c.nombre, c.descripcion, c.unidad, c.precio,
                          c.aplica_iva, c.pct_iva, c.inst_default, c.config_default, c.categoria
                          FROM items i JOIN catalogo c ON i.id_producto=c.id_producto
                          WHERE i.cot_id=? ORDER BY i.linea""", (cot['id'],))
-    items = [{**it, **calcular_item(it, it, pl)} for it in items_raw]
-    presentation = preparar_presentacion_cotizacion(items)
+    items = [_repair_mojibake_obj({**it, **calcular_item(it, it, pl)}) for it in items_raw]
+    presentation = _repair_mojibake_obj(preparar_presentacion_cotizacion(items))
     grouped_items = presentation['grouped_items']
     service_items = presentation['service_items']
-    tots = calcular_cotizacion(cot['id'])
-    params = {r['clave']: r['valor'] for r in query("SELECT * FROM parametros")}
+    tots = _repair_mojibake_obj(calcular_cotizacion(cot['id']))
+    params = _repair_mojibake_obj({r['clave']: r['valor'] for r in query("SELECT * FROM parametros")})
     base = request.host_url.rstrip('/')
     return render_template_string(PUBLIC_VIEW_TEMPLATE, cot=cot, items=presentation['items'], grouped_items=grouped_items,
         service_items=service_items, productos_total=presentation['productos_total'], servicios_total=presentation['servicios_total'], tots=tots, params=params,
@@ -2965,17 +3013,18 @@ def public_accept(token):
 def public_pdf(token):
     cot = _get_cot_by_token(token)
     if not cot: return "Not found", 404
+    cot = _repair_mojibake_obj(cot)
     pl = float(cot.get('price_list_desc_pct') or 0)
     items_raw = query("""SELECT i.*, c.nombre, c.descripcion, c.unidad, c.precio,
                          c.aplica_iva, c.pct_iva, c.inst_default, c.config_default, c.categoria
                          FROM items i JOIN catalogo c ON i.id_producto=c.id_producto
                          WHERE i.cot_id=? ORDER BY i.linea""", (cot['id'],))
-    items = [{**it, **calcular_item(it, it, pl)} for it in items_raw]
-    presentation = preparar_presentacion_cotizacion(items)
+    items = [_repair_mojibake_obj({**it, **calcular_item(it, it, pl)}) for it in items_raw]
+    presentation = _repair_mojibake_obj(preparar_presentacion_cotizacion(items))
     grouped_items = presentation['grouped_items']
     service_items = presentation['service_items']
-    tots = calcular_cotizacion(cot['id'])
-    params = {r['clave']: r['valor'] for r in query("SELECT * FROM parametros")}
+    tots = _repair_mojibake_obj(calcular_cotizacion(cot['id']))
+    params = _repair_mojibake_obj({r['clave']: r['valor'] for r in query("SELECT * FROM parametros")})
     from io import BytesIO
     from reportlab.lib.pagesizes import letter
     from reportlab.pdfgen import canvas
@@ -2984,7 +3033,7 @@ def public_pdf(token):
     w, h = letter
     y = h - 40
     c.setFont("Helvetica-Bold", 14)
-    c.drawString(40, y, f"CotizaciÃ³n {cot.get('no_cotizacion','')}")
+    c.drawString(40, y, f"Cotizacion {cot.get('no_cotizacion','')}")
     y -= 18
     c.setFont("Helvetica", 10)
     c.drawString(40, y, f"Cliente: {cot.get('cliente','')}  |  Proyecto: {cot.get('proyecto','') or 'N/A'}")
@@ -3067,7 +3116,7 @@ def public_pdf(token):
     c.drawRightString(545, y, f"{int(tots.get('total_final',0)):,}".replace(',', '.'))
     y -= 18
     c.setFont("Helvetica", 9)
-    c.drawString(40, y, f"GarantÃ­a: {params.get('garantia','')} Â· Vigencia: {params.get('vigencia_dias','')} dÃ­as Â· Plazo: {params.get('plazo_entrega','')}")
+    c.drawString(40, y, f"Garantia: {params.get('garantia','')} - Vigencia: {params.get('vigencia_dias','')} dias - Plazo: {params.get('plazo_entrega','')}")
     c.showPage(); c.save()
     buf.seek(0)
     filename = f"{cot.get('no_cotizacion','cotizacion')}.pdf"
@@ -3082,18 +3131,19 @@ def public_view_no(no):
     cot = _get_cot_by_no(no)
     if not cot:
         return "Not found", 404
+    cot = _repair_mojibake_obj(cot)
     token = ensure_public_token(cot['id'])
     pl = float(cot.get('price_list_desc_pct') or 0)
     items_raw = query("""SELECT i.*, c.nombre, c.descripcion, c.unidad, c.precio,
                          c.aplica_iva, c.pct_iva, c.inst_default, c.config_default, c.categoria
                          FROM items i JOIN catalogo c ON i.id_producto=c.id_producto
                          WHERE i.cot_id=? ORDER BY i.linea""", (cot['id'],))
-    items = [{**it, **calcular_item(it, it, pl)} for it in items_raw]
-    presentation = preparar_presentacion_cotizacion(items)
+    items = [_repair_mojibake_obj({**it, **calcular_item(it, it, pl)}) for it in items_raw]
+    presentation = _repair_mojibake_obj(preparar_presentacion_cotizacion(items))
     grouped_items = presentation['grouped_items']
     service_items = presentation['service_items']
-    tots = calcular_cotizacion(cot['id'])
-    params = {r['clave']: r['valor'] for r in query("SELECT * FROM parametros")}
+    tots = _repair_mojibake_obj(calcular_cotizacion(cot['id']))
+    params = _repair_mojibake_obj({r['clave']: r['valor'] for r in query("SELECT * FROM parametros")})
     base = request.host_url.rstrip('/')
     import urllib.parse
     no_q = urllib.parse.quote(no, safe='')
