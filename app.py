@@ -123,10 +123,31 @@ def _set_security_headers(resp):
     try:
         resp.headers['X-Content-Type-Options'] = 'nosniff'
         resp.headers['X-Frame-Options'] = 'DENY'
+        resp.headers['X-Permitted-Cross-Domain-Policies'] = 'none'
         resp.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
         resp.headers['Permissions-Policy'] = 'geolocation=(), microphone=(), camera=()'
-        # CSP conservadora para no romper el frontend
-        resp.headers['Content-Security-Policy'] = "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'"
+        # CSP conservadora para no romper el frontend y permitir Google Fonts
+        resp.headers['Content-Security-Policy'] = (
+            "default-src 'self'; "
+            "base-uri 'self'; "
+            "object-src 'none'; "
+            "form-action 'self'; "
+            "img-src 'self' data: https:; "
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+            "font-src 'self' https://fonts.gstatic.com data:; "
+            "script-src 'self' 'unsafe-inline'; "
+            "connect-src 'self'; "
+            "frame-ancestors 'none'"
+        )
+        # Evita que páginas, APIs y PDFs sensibles queden cacheados en el navegador.
+        if request.path != '/health' and not request.path.startswith('/static/'):
+            if (
+                request.path.startswith(('/api/', '/print/', '/q/', '/cotizacion/', '/export/'))
+                or resp.mimetype in ('text/html', 'application/json', 'application/pdf', 'text/plain')
+            ):
+                resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+                resp.headers['Pragma'] = 'no-cache'
+                resp.headers['Expires'] = '0'
         if IS_PROD:
             resp.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
     except Exception:
@@ -1383,18 +1404,20 @@ def api_login():
     except Exception:
         pass
 
-    # CSRF token de sesiÃ³n
-    tok = _csrf_token()
-
+    # Renovar la sesiÃ³n para evitar fixation y limpiar residuos previos.
+    session.clear()
+    session.permanent = True
     must_change = int(u.get('must_change_password') or 0) == 1
     session['user'] = {'id': u['id'], 'username': u['username'], 'role': u.get('role', 'admin'), 'must_change_password': must_change}
+    # CSRF token de sesiÃ³n
+    tok = _csrf_token()
     return jsonify({'ok': True, 'user': session['user'], 'csrf_token': tok, 'must_change_password': must_change})
 
 
 @app.post('/api/logout')
 @login_required
 def api_logout():
-    session.pop('user', None)
+    session.clear()
     return jsonify({'ok': True})
 
 @app.post('/api/change_password')
