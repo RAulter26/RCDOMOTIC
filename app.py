@@ -67,6 +67,8 @@ ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp'}
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(BACKUP_DIR, exist_ok=True)
+AUDIT_LOG_PATH = os.environ.get('AUDIT_LOG_PATH') or os.path.join(DATA_DIR, 'security_audit.jsonl')
+os.makedirs(os.path.dirname(AUDIT_LOG_PATH) or DATA_DIR, exist_ok=True)
 
 def _maybe_migrate_legacy_db():
     """Si cambió DB_PATH a ruta persistente, copia la BD legacy una sola vez."""
@@ -150,6 +152,22 @@ def _set_security_headers(resp):
                 resp.headers['Expires'] = '0'
         if IS_PROD:
             resp.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+        try:
+            path = request.path or ''
+            should_audit = (
+                path.startswith('/api/admin/')
+                or path.startswith('/api/bot/')
+                or (path.startswith('/api/') and request.method in ('POST', 'PUT', 'PATCH', 'DELETE')
+                    and path not in ('/api/login', '/api/logout', '/api/change_password', '/api/admin/db_backup', '/api/admin/db_restore'))
+            )
+            if should_audit:
+                _audit_event(
+                    'http_request',
+                    outcome='ok' if getattr(resp, 'status_code', 0) < 400 else 'error',
+                    status_code=int(getattr(resp, 'status_code', 0) or 0),
+                )
+        except Exception:
+            pass
     except Exception:
         pass
     return resp
@@ -227,6 +245,89 @@ def role_required(*roles):
             return fn(*args, **kwargs)
         return _wrap
     return deco
+
+def _audit_mask_text(value, keep=3):
+    text = str(value or '')
+    if len(text) <= (keep * 2) + 2:
+        return '*' * len(text)
+    return f"{text[:keep]}...{text[-keep:]}"
+
+def _audit_sanitize(value, key=''):
+    key_l = str(key or '').lower()
+    if isinstance(value, dict):
+        return {str(k): _audit_sanitize(v, k) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_audit_sanitize(v, key_l) for v in value]
+    if isinstance(value, tuple):
+        return tuple(_audit_sanitize(v, key_l) for v in value)
+    if any(tok in key_l for tok in ('password', 'secret', 'token', 'csrf', 'authorization', 'cookie', 'bot_key', 'audio_b64', 'prompt', 'texto_original')):
+        return '[redacted]'
+    if key_l in {'chat_id', 'telefono', 'nit_cc', 'nit', 'email', 'email_cliente'}:
+        return _audit_mask_text(value, keep=2)
+    if isinstance(value, (datetime.datetime, datetime.date)):
+        return value.isoformat()
+    if isinstance(value, (int, float, bool)) or value is None:
+        return value
+    if isinstance(value, str):
+        return value[:250] + ('...' if len(value) > 250 else '')
+    return str(value)
+
+def _audit_event(action, outcome='ok', actor=None, **details):
+    try:
+        payload = {
+            'ts': datetime.datetime.utcnow().replace(microsecond=0).isoformat() + 'Z',
+            'action': action,
+            'outcome': outcome,
+        }
+        try:
+            payload['path'] = request.path or ''
+            payload['method'] = request.method or ''
+            payload['ip'] = request.remote_addr or ''
+            ua = request.headers.get('User-Agent') or ''
+            if ua:
+                payload['ua'] = _audit_sanitize(ua, 'user_agent')
+        except Exception:
+            pass
+
+        if actor is None:
+            actor = current_user()
+        if isinstance(actor, dict) and actor:
+            payload['actor'] = {
+                'type': actor.get('type') or 'user',
+                'id': actor.get('id'),
+                'username': actor.get('username'),
+                'role': actor.get('role'),
+            }
+        elif actor:
+            payload['actor'] = {'type': 'user', 'username': str(actor)}
+        else:
+            payload['actor'] = {'type': 'bot' if str(payload.get('path') or '').startswith('/api/bot/') else 'anonymous'}
+
+        if details:
+            payload['details'] = _audit_sanitize(details)
+
+        with open(AUDIT_LOG_PATH, 'a', encoding='utf-8') as f:
+            f.write(json.dumps(payload, ensure_ascii=False, separators=(',', ':')) + '\n')
+    except Exception:
+        pass
+
+def _read_audit_tail(limit=50):
+    if not os.path.isfile(AUDIT_LOG_PATH):
+        return []
+    rows = []
+    try:
+        with open(AUDIT_LOG_PATH, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    rows.append(json.loads(line))
+                except Exception:
+                    continue
+    except Exception:
+        return []
+    return rows[-limit:]
 
 _MOJIBAKE_HINTS = ('Ã', 'Â', 'â', 'ð', '\ufffd')
 
@@ -1389,11 +1490,13 @@ def api_login():
     username = (d.get('username') or '').strip()
     password = d.get('password') or ''
     if not username or not password:
+        _audit_event('login_failed', outcome='rejected', username=username or '', reason='missing_fields')
         return jsonify({'ok': False, 'error': 'Usuario y contraseÃ±a requeridos'}), 400
 
     u = query("SELECT * FROM users WHERE username=?", (username,), one=True)
     if not u or not verify_password(u.get('password_hash') or '', password):
         # Respuesta genÃ©rica para no filtrar existencia de usuarios
+        _audit_event('login_failed', outcome='rejected', username=username, reason='invalid_credentials')
         return jsonify({'ok': False, 'error': 'Credenciales invÃ¡lidas'}), 401
 
     # RotaciÃ³n automÃ¡tica a Argon2 cuando estÃ© disponible
@@ -1411,12 +1514,17 @@ def api_login():
     session['user'] = {'id': u['id'], 'username': u['username'], 'role': u.get('role', 'admin'), 'must_change_password': must_change}
     # CSRF token de sesiÃ³n
     tok = _csrf_token()
+    actor = {'type': 'user', 'id': u['id'], 'username': u['username'], 'role': u.get('role', 'admin')}
+    _audit_event('login_success', actor=actor, must_change_password=must_change)
     return jsonify({'ok': True, 'user': session['user'], 'csrf_token': tok, 'must_change_password': must_change})
 
 
 @app.post('/api/logout')
 @login_required
 def api_logout():
+    u = current_user()
+    if u:
+        _audit_event('logout', actor=u)
     session.clear()
     return jsonify({'ok': True})
 
@@ -1428,16 +1536,20 @@ def api_change_password():
     old = d.get('old_password') or ''
     new = d.get('new_password') or ''
     if not new or len(new) < 10:
+        _audit_event('password_change_failed', outcome='rejected', reason='weak_password')
         return jsonify({'ok': False, 'error': 'La nueva contraseÃ±a debe tener mÃ­nimo 10 caracteres.'}), 400
     u = current_user()
     row = query("SELECT * FROM users WHERE id=?", (u['id'],), one=True)
     if not row:
+        _audit_event('password_change_failed', outcome='error', reason='user_not_found')
         return jsonify({'ok': False, 'error': 'Usuario no encontrado'}), 404
     if not verify_password(row.get('password_hash') or '', old):
+        _audit_event('password_change_failed', outcome='rejected', reason='wrong_current_password')
         return jsonify({'ok': False, 'error': 'ContraseÃ±a actual incorrecta'}), 401
     execute("UPDATE users SET password_hash=?, must_change_password=0 WHERE id=?", (hash_password(new), row['id']))
     # refrescar bandera en sesiÃ³n
     session['user']['must_change_password'] = False
+    _audit_event('password_changed', actor=current_user(), user_id=row['id'])
     return jsonify({'ok': True})
 
 
@@ -2151,9 +2263,12 @@ def api_db_backup():
     try:
         out = snapshot_db('admin')
         if not out:
+            _audit_event('db_backup', outcome='rejected', reason='no_database_available')
             return jsonify({'ok': False, 'error': 'No existe base para respaldar'}), 404
+        _audit_event('db_backup', backup=os.path.basename(out), backup_path=out, size=os.path.getsize(out))
         return jsonify({'ok': True, 'backup': os.path.basename(out), 'path': out})
     except Exception as e:
+        _audit_event('db_backup', outcome='error', error=str(e))
         return jsonify({'ok': False, 'error': str(e)}), 500
 
 @app.get('/api/admin/db_scan')
@@ -2200,15 +2315,24 @@ def api_db_restore():
         data = request.json or {}
         src = os.path.abspath(str(data.get('path') or '').strip())
         if not src or not os.path.isfile(src):
+            _audit_event('db_restore', outcome='rejected', reason='source_missing', requested_path=src)
             return jsonify({'ok': False, 'error': 'Archivo origen no existe'}), 404
         # Permitir restaurar solo desde rutas locales esperadas
         allowed_roots = [os.path.abspath(x) for x in [DATA_DIR, BASE_DIR, '/var/data', '/tmp'] if x and os.path.isdir(x)]
         if not any(src.startswith(root + os.sep) or src == root for root in allowed_roots):
+            _audit_event('db_restore', outcome='rejected', reason='forbidden_source', requested_path=src)
             return jsonify({'ok': False, 'error': 'Ruta origen no permitida'}), 403
         cot_count, item_count = _db_counts_from_file(src)
         backup_prev = snapshot_db('pre_restore')
         os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
         shutil.copy2(src, DB_PATH)
+        _audit_event(
+            'db_restore',
+            restored_from=src,
+            backup_previous=backup_prev,
+            cotizaciones=cot_count,
+            items=item_count,
+        )
         return jsonify({
             'ok': True,
             'restored_from': src,
@@ -2217,6 +2341,21 @@ def api_db_restore():
             'items': item_count,
             'db_path': DB_PATH,
         })
+    except Exception as e:
+        _audit_event('db_restore', outcome='error', error=str(e))
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+@app.get('/api/admin/security_events')
+@role_required('admin')
+def api_security_events():
+    try:
+        try:
+            limit_n = int(request.args.get('limit', 50))
+        except Exception:
+            limit_n = 50
+        limit_n = max(1, min(limit_n, 200))
+        events = _read_audit_tail(limit_n)
+        return jsonify({'ok': True, 'path': AUDIT_LOG_PATH, 'count': len(events), 'events': events})
     except Exception as e:
         return jsonify({'ok': False, 'error': str(e)}), 500
 
