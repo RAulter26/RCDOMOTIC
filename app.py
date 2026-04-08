@@ -158,7 +158,7 @@ def _set_security_headers(resp):
                 path.startswith('/api/admin/')
                 or path.startswith('/api/bot/')
                 or (path.startswith('/api/') and request.method in ('POST', 'PUT', 'PATCH', 'DELETE')
-                    and path not in ('/api/login', '/api/logout', '/api/change_password', '/api/admin/db_backup', '/api/admin/db_restore'))
+                    and path not in ('/api/login', '/api/logout', '/api/change_password', '/api/admin/db_backup', '/api/admin/db_restore', '/api/admin/security_events'))
             )
             if should_audit:
                 _audit_event(
@@ -2355,6 +2355,7 @@ def api_security_events():
             limit_n = 50
         limit_n = max(1, min(limit_n, 200))
         events = _read_audit_tail(limit_n)
+        _audit_event('security_events_view', actor=current_user(), limit=limit_n, returned=len(events))
         return jsonify({'ok': True, 'path': AUDIT_LOG_PATH, 'count': len(events), 'events': events})
     except Exception as e:
         return jsonify({'ok': False, 'error': str(e)}), 500

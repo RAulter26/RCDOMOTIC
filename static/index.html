@@ -469,6 +469,28 @@ table.tbl tbody tr:hover { background: var(--acc-soft) }
 .margin-box .mg-row { display: flex; justify-content: space-between; padding: 2px 0; font-size: 12px }
 .margin-box .mg-row.hi { font-weight: 800; color: #15803d }
 
+
+/* SECURITY AUDIT */
+.audit-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 10px }
+.audit-kpis { display: flex; gap: 6px; flex-wrap: wrap; align-items: center }
+.audit-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: .2px;
+  background: #f3f4f6;
+  color: #4b5563;
+}
+.audit-pill.ok { background: #ecfdf5; color: #15803d }
+.audit-pill.warn { background: #fffbeb; color: #b45309 }
+.audit-pill.err { background: #fef2f2; color: #dc2626 }
+.audit-path { font-family: var(--font-mono); font-size: 11px; color: var(--txtL); word-break: break-all }
+.audit-detail { font-size: 11px; line-height: 1.45; color: var(--txtL) }
+.audit-table td { vertical-align: top }
+
 /* ─── CMD VISUAL (tablet) ─── */
 .cmdv-grid { display: grid; grid-template-columns: 1.2fr .8fr; gap: 16px; align-items: start }
 @media(max-width:980px) { .cmdv-grid { grid-template-columns: 1fr } }
@@ -1146,6 +1168,21 @@ table.tbl tbody tr:hover { background: var(--acc-soft) }
 <div class="page" id="pg-config">
   <div class="card"><h2>⚙ Parámetros</h2><div id="configForm"></div>
   <button class="btn btn-p" onclick="saveConfig()" style="margin-top:8px">💾 Guardar</button></div>
+
+  <div class="card" style="margin-top:14px">
+    <div class="audit-head">
+      <div>
+        <h2 style="margin-bottom:4px">Seguridad y auditoria</h2>
+        <div class="muted" style="font-size:12px">Ultimos eventos sensibles: login, backups, restauracion y bot.</div>
+      </div>
+      <div id="securityMeta" class="muted" style="font-size:12px"></div>
+    </div>
+    <div class="toolbar" style="margin-bottom:10px">
+      <button class="btn btn-o btn-sm" onclick="loadSecurityEvents()">Recargar</button>
+      <span id="securityCounts" class="audit-pill">Cargando...</span>
+    </div>
+    <div id="securityEventsBox"><div class="muted">Abre esta seccion para ver la auditoria.</div></div>
+  </div>
 </div>
 </div>
 
@@ -1229,6 +1266,7 @@ const cmdTemplate=`{\n  "cliente": "",\n  "proyecto": "",\n  "ciudad": "Sincelej
 let PARAMS={}, CATALOGO=[], CATEGORIAS=[], COT_ITEMS=[], COT_EDIT_ID=null;
 let ME=null, PRICE_LISTS=[];
 let CSRF_TOKEN='';
+let SECURITY_EVENTS=[];
 let PREV_PAGE='cots';
 
 function showLogin(msg=''){ $('#loginMask').style.display='flex'; $('#loginErr').style.display = msg? 'block':'none'; $('#loginErr').textContent = msg; setTimeout(()=>$('#loginUser').focus(),50)}
@@ -2614,6 +2652,17 @@ async function execCmd(){
 
 /* ═══════════ CONFIG ═══════════ */
 async function loadConfig(){
+  const role = String(ME?.role||'').toLowerCase();
+  if(role !== 'admin'){
+    $('#configForm').innerHTML = '<div class="muted">Solo admin puede ver y cambiar parametros.</div>';
+    const box = $('#securityEventsBox');
+    const meta = $('#securityMeta');
+    const counts = $('#securityCounts');
+    if(box) box.innerHTML = '<div class="muted">Solo admin puede ver esta seccion.</div>';
+    if(meta) meta.textContent = '';
+    if(counts) counts.textContent = 'Solo admin';
+    return;
+  }
   PARAMS=await api('/api/parametros');
   const fs=[['empresa','Empresa'],['nit','NIT'],['direccion','Dirección'],['ciudad','Ciudad'],
     ['telefono','Teléfono'],['email','Email'],['contacto','Contacto'],['banco','Banco'],
@@ -2623,6 +2672,7 @@ async function loadConfig(){
     ['anticipo_default','Anticipo default'],['meta_ventas_mes','Meta ventas mes (COP)'],
     ['brand_primary','Color primario'],['brand_accent','Color acento']];
   $('#configForm').innerHTML=fs.map(([k,l])=>`<div class="fg"><label>${l}</label><input id="cfg_${k}" value="${PARAMS[k]||''}"></div>`).join('');
+  await loadSecurityEvents();
 }
 async function saveConfig(){
   const d={};$$('[id^="cfg_"]').forEach(e=>{d[e.id.replace('cfg_','')]=e.value});
@@ -2632,6 +2682,137 @@ async function saveConfig(){
   toast('✅ Guardado');
 }
 
+
+function auditOutcomeClass(outcome){
+  const v=String(outcome||'ok').toLowerCase();
+  if(v==='ok' || v==='success') return 'ok';
+  if(v==='rejected' || v==='warn' || v==='warning') return 'warn';
+  if(v==='error' || v==='failed') return 'err';
+  return '';
+}
+
+function auditOutcomeLabel(outcome){
+  const v=String(outcome||'ok').toLowerCase();
+  if(v==='ok' || v==='success') return 'OK';
+  if(v==='rejected' || v==='warn' || v==='warning') return 'Rechazado';
+  if(v==='error' || v==='failed') return 'Error';
+  return v.replace(/_/g,' ');
+}
+
+function auditActorLabel(actor){
+  if(!actor) return '-';
+  if(actor.type==='bot') return 'BOT';
+  const bits=[];
+  if(actor.username) bits.push(actor.username);
+  if(actor.role) bits.push(actor.role);
+  if(actor.id!==undefined && actor.id!==null && actor.id!=='') bits.push(`#${actor.id}`);
+  if(!bits.length && actor.type) bits.push(actor.type);
+  return esc(bits.join(' | '));
+}
+
+function auditTimeLabel(ts){
+  if(!ts) return '-';
+  const d = new Date(ts);
+  if(Number.isNaN(d.getTime())) return esc(String(ts));
+  return esc(d.toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'medium' }));
+}
+
+function auditContextLines(ev){
+  const lines=[];
+  if(ev.method || ev.status_code){
+    lines.push([ev.method||'', ev.status_code ? `HTTP ${ev.status_code}` : ''].filter(Boolean).join(' | '));
+  }
+  if(ev.path) lines.push(ev.path);
+  const d = ev.details || {};
+  const pick = (k, label=k) => {
+    const v = d[k];
+    if(v===undefined || v===null || v==='') return;
+    lines.push(`${label}: ${typeof v==='object' ? JSON.stringify(v) : String(v)}`);
+  };
+  pick('reason', 'motivo');
+  pick('limit', 'limite');
+  pick('count', 'conteo');
+  pick('returned', 'devueltos');
+  pick('user_id', 'usuario');
+  pick('backup', 'backup');
+  pick('restored_from', 'restaurado desde');
+  pick('requested_path', 'ruta');
+  pick('size', 'tamano');
+  pick('error', 'error');
+  pick('must_change_password', 'cambio obligatorio');
+  return lines.slice(0,5).map(esc).join('<br>') || '-';
+}
+
+async function loadSecurityEvents(){
+  const box = $('#securityEventsBox');
+  const meta = $('#securityMeta');
+  const counts = $('#securityCounts');
+  if(!box) return;
+  const role = String(ME?.role||'').toLowerCase();
+  if(role !== 'admin'){
+    SECURITY_EVENTS = [];
+    if(meta) meta.textContent = '';
+    if(counts) counts.textContent = 'Solo admin';
+    box.innerHTML = '<div class="muted">Esta seccion es solo para admin.</div>';
+    return;
+  }
+  box.innerHTML = '<div class="muted">Cargando auditoria...</div>';
+  if(meta) meta.textContent = 'Leyendo ultimos eventos del sistema';
+  if(counts) counts.textContent = 'Cargando...';
+  const r = await api('/api/admin/security_events?limit=25');
+  if(!r || r.ok===false){
+    SECURITY_EVENTS = [];
+    if(meta) meta.textContent = '';
+    if(counts) counts.textContent = 'Error';
+    box.innerHTML = `<div class="muted">No se pudo cargar la auditoria${r?.error ? `: ${esc(r.error)}` : ''}.</div>`;
+    return;
+  }
+  const events = Array.isArray(r.events) ? r.events : [];
+  SECURITY_EVENTS = events;
+  const totals = events.reduce((acc, ev) => {
+    const k = String(ev.outcome || 'ok').toLowerCase();
+    acc[k] = (acc[k] || 0) + 1;
+    return acc;
+  }, {});
+  if(meta) meta.textContent = r.path ? `Archivo: ${r.path}` : '';
+  if(counts){
+    counts.innerHTML = `
+      <span class="audit-pill ok">OK ${totals.ok || 0}</span>
+      <span class="audit-pill warn">Rechazados ${totals.rejected || 0}</span>
+      <span class="audit-pill err">Errores ${totals.error || 0}</span>
+      <span class="audit-pill">Total ${events.length}</span>
+    `;
+  }
+  if(!events.length){
+    box.innerHTML = '<div class="muted">Aun no hay eventos de auditoria.</div>';
+    return;
+  }
+  const rows = events.map(ev => `
+    <tr>
+      <td style="white-space:nowrap">${auditTimeLabel(ev.ts)}</td>
+      <td><b>${esc(String(ev.action || 'evento').replace(/_/g, ' '))}</b></td>
+      <td>${auditActorLabel(ev.actor)}</td>
+      <td><span class="audit-pill ${auditOutcomeClass(ev.outcome)}">${esc(auditOutcomeLabel(ev.outcome))}</span></td>
+      <td><div class="audit-detail">${auditContextLines(ev)}</div></td>
+    </tr>
+  `).join('');
+  box.innerHTML = `
+    <div class="tbl-wrap">
+      <table class="dt audit-table">
+        <thead>
+          <tr>
+            <th>Hora</th>
+            <th>Accion</th>
+            <th>Actor</th>
+            <th>Estado</th>
+            <th>Contexto</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
+}
 // ─── INVENTARIO UI ─────────────────────────────────────────────
 let INV_ITEMS=[]; let BUY_LIST=[]; let PROV_LIST=[]; let INV_VIEW = localStorage.getItem("inv_view") || "table";
 
