@@ -1188,6 +1188,7 @@ table.tbl tbody tr:hover { background: var(--acc-soft) }
     <div id="securityCheckBox" class="muted" style="margin-bottom:10px">Validando seguridad de nube...</div>
     <div class="toolbar" style="margin-bottom:10px">
       <button class="btn btn-o btn-sm" onclick="loadSecurityEvents()">Recargar</button>
+      <button class="btn btn-o btn-sm" onclick="downloadBackupFile()">Descargar backup</button>
       <button class="btn btn-o btn-sm" onclick="runBackupVerify()">Verificar backup</button>
       <button class="btn btn-o btn-sm" onclick="runAutoBackupNow()">Forzar auto backup</button>
       <span id="securityCounts" class="audit-pill">Cargando...</span>
@@ -2811,6 +2812,12 @@ async function runBackupVerify(){
   const ageTxt = age > 0 ? `${Math.round(age/60)} min` : '0 min';
   toast(v.ok ? `Backup OK (${ageTxt})` : `Backup con alerta (${ageTxt})`);
   await loadSecurityEvents();
+}
+
+function downloadBackupFile(){
+  const role = String(ME?.role||'').toLowerCase();
+  if(role !== 'admin'){ toast('Solo admin'); return; }
+  window.open('/api/admin/db_backup_download', '_blank');
 }
 
 async function runAutoBackupNow(){

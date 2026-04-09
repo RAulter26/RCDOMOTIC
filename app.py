@@ -3111,6 +3111,37 @@ def api_db_backup():
         _audit_event('db_backup', outcome='error', error=str(e))
         return jsonify({'ok': False, 'error': str(e)}), 500
 
+@app.get('/api/admin/db_backup_download')
+@role_required('admin')
+def api_db_backup_download():
+    try:
+        sec = _runtime_security_settings(force=True)
+        out = snapshot_db('download')
+        if not out:
+            _audit_event('db_backup_download', outcome='rejected', actor=current_user(), reason='no_database_available')
+            return jsonify({'ok': False, 'error': 'No existe base para respaldar'}), 404
+        verify = _verify_sqlite_file(out)
+        removed = _prune_backup_files(int(sec.get('auto_backup_keep') or AUTO_BACKUP_KEEP_DEFAULT))
+        size = os.path.getsize(out) if os.path.isfile(out) else 0
+        _audit_event(
+            'db_backup_download',
+            outcome='ok' if verify.get('ok') else 'error',
+            actor=current_user(),
+            backup=os.path.basename(out),
+            size=size,
+            integrity=verify.get('integrity'),
+            removed_old=removed,
+        )
+        return send_file(
+            out,
+            mimetype='application/octet-stream',
+            as_attachment=True,
+            download_name=os.path.basename(out)
+        )
+    except Exception as e:
+        _audit_event('db_backup_download', outcome='error', actor=current_user(), error=str(e))
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
 @app.post('/api/admin/auto_backup_now')
 @role_required('admin')
 def api_auto_backup_now():
