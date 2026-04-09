@@ -2257,6 +2257,162 @@ def api_db_status():
     except Exception as e:
         return jsonify({'ok': False, 'error': str(e)}), 500
 
+@app.get('/api/admin/security_check')
+@role_required('admin')
+def api_security_check():
+    """Checklist de hardening y persistencia para validar la nube con evidencia."""
+    try:
+        now_utc = datetime.datetime.utcnow().replace(microsecond=0).isoformat() + 'Z'
+        secret = app.secret_key or ''
+        data_dir_abs = os.path.abspath(DATA_DIR)
+        db_path_abs = os.path.abspath(DB_PATH)
+        backup_dir_abs = os.path.abspath(BACKUP_DIR)
+        audit_path_abs = os.path.abspath(AUDIT_LOG_PATH)
+
+        is_persist_path = lambda p: p.startswith('/var/data')
+        checks = []
+        def add(cid, label, ok, value=None, recommendation=''):
+            checks.append({
+                'id': cid,
+                'label': label,
+                'ok': bool(ok),
+                'value': value,
+                'recommendation': recommendation,
+            })
+
+        add(
+            'secret_not_default',
+            'SECRET_KEY no usa valor por defecto',
+            secret != _DEFAULT_SECRET_KEY,
+            value='configured' if secret and secret != _DEFAULT_SECRET_KEY else 'default_or_empty',
+            recommendation='Configurar SECRET_KEY larga y aleatoria en Render.'
+        )
+        add(
+            'secret_strength',
+            'SECRET_KEY con longitud recomendada (>=32)',
+            len(secret) >= 32,
+            value=len(secret),
+            recommendation='Usar una clave de al menos 32 caracteres.'
+        )
+        add(
+            'bot_key_configured',
+            'BOT_KEY configurada',
+            len(BOT_KEYS) > 0,
+            value=len(BOT_KEYS),
+            recommendation='Definir BOT_KEY fuerte (o varias, separadas por coma).'
+        )
+        add(
+            'bot_key_not_default',
+            'BOT_KEY sin valor de desarrollo',
+            (_DEFAULT_BOT_KEY not in BOT_KEYS),
+            value='default_present' if (_DEFAULT_BOT_KEY in BOT_KEYS) else 'ok',
+            recommendation='Quitar el BOT_KEY de desarrollo en entornos reales.'
+        )
+        add(
+            'session_cookie_secure',
+            'Cookie de sesion segura (HTTPS)',
+            bool(app.config.get('SESSION_COOKIE_SECURE')),
+            value=bool(app.config.get('SESSION_COOKIE_SECURE')),
+            recommendation='Mantener SESSION_COOKIE_SECURE=True en produccion.'
+        )
+        add(
+            'session_cookie_httponly',
+            'Cookie de sesion HttpOnly',
+            bool(app.config.get('SESSION_COOKIE_HTTPONLY')),
+            value=bool(app.config.get('SESSION_COOKIE_HTTPONLY')),
+            recommendation='Mantener SESSION_COOKIE_HTTPONLY=True.'
+        )
+        add(
+            'session_cookie_samesite',
+            'Cookie SameSite en Lax/Strict',
+            str(app.config.get('SESSION_COOKIE_SAMESITE', '')).lower() in ('lax', 'strict'),
+            value=app.config.get('SESSION_COOKIE_SAMESITE'),
+            recommendation='Usar SameSite Lax o Strict.'
+        )
+        add(
+            'db_persistent_path',
+            'Base de datos en ruta persistente',
+            is_persist_path(db_path_abs),
+            value=db_path_abs,
+            recommendation='Usar DB_PATH en /var/data/rc_domotic.db.'
+        )
+        add(
+            'data_dir_persistent',
+            'DATA_DIR en almacenamiento persistente',
+            is_persist_path(data_dir_abs),
+            value=data_dir_abs,
+            recommendation='Configurar DATA_DIR=/var/data en Render.'
+        )
+        add(
+            'backup_dir_persistent',
+            'BACKUP_DIR en almacenamiento persistente',
+            is_persist_path(backup_dir_abs),
+            value=backup_dir_abs,
+            recommendation='Configurar BACKUP_DIR dentro de /var/data.'
+        )
+        add(
+            'audit_log_persistent',
+            'Audit log en almacenamiento persistente',
+            is_persist_path(audit_path_abs),
+            value=audit_path_abs,
+            recommendation='Configurar AUDIT_LOG_PATH dentro de /var/data.'
+        )
+        add(
+            'db_exists',
+            'Archivo de base existe',
+            os.path.isfile(DB_PATH),
+            value=os.path.getsize(DB_PATH) if os.path.isfile(DB_PATH) else 0,
+            recommendation='Verificar montaje de disco y ruta de DB_PATH.'
+        )
+        add(
+            'backup_dir_writable',
+            'Directorio de backups escribible',
+            os.access(BACKUP_DIR, os.W_OK),
+            value=backup_dir_abs,
+            recommendation='Asegurar permisos de escritura en BACKUP_DIR.'
+        )
+        add(
+            'audit_log_writable',
+            'Archivo/directorio de auditoria escribible',
+            os.access(os.path.dirname(audit_path_abs) or DATA_DIR, os.W_OK),
+            value=audit_path_abs,
+            recommendation='Asegurar permisos de escritura de AUDIT_LOG_PATH.'
+        )
+        add(
+            'limiter_enabled',
+            'Rate limit habilitado',
+            limiter is not None,
+            value=bool(limiter is not None),
+            recommendation='Instalar flask-limiter en entorno productivo.'
+        )
+
+        total = len(checks)
+        ok_n = len([c for c in checks if c['ok']])
+        fail_n = total - ok_n
+        level = 'ok' if fail_n == 0 else ('warn' if fail_n <= 3 else 'error')
+        return jsonify({
+            'ok': True,
+            'generated_at': now_utc,
+            'level': level,
+            'summary': {
+                'ok': ok_n,
+                'fail': fail_n,
+                'total': total,
+            },
+            'env': {
+                'is_prod': bool(IS_PROD),
+                'render_env': bool(os.environ.get('RENDER') or os.environ.get('RENDER_SERVICE_ID')),
+                'data_dir': data_dir_abs,
+                'db_path': db_path_abs,
+                'backup_dir': backup_dir_abs,
+                'audit_log_path': audit_path_abs,
+                'max_upload_bytes': int(app.config.get('MAX_CONTENT_LENGTH') or 0),
+            },
+            'checks': checks,
+        })
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
 @app.post('/api/admin/db_backup')
 @role_required('admin')
 def api_db_backup():

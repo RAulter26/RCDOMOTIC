@@ -490,6 +490,13 @@ table.tbl tbody tr:hover { background: var(--acc-soft) }
 .audit-path { font-family: var(--font-mono); font-size: 11px; color: var(--txtL); word-break: break-all }
 .audit-detail { font-size: 11px; line-height: 1.45; color: var(--txtL) }
 .audit-table td { vertical-align: top }
+.sec-check-grid { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); margin-bottom: 10px }
+.sec-check-item { border: 1px solid var(--brd); border-radius: 10px; padding: 10px; background: #fff }
+.sec-check-item.ok { border-color: #bbf7d0; background: #f0fdf4 }
+.sec-check-item.fail { border-color: #fecaca; background: #fef2f2 }
+.sec-check-item .t { font-size: 11px; font-weight: 700; color: var(--txtL); margin-bottom: 4px; text-transform: uppercase; letter-spacing: .3px }
+.sec-check-item .v { font-size: 12px; font-weight: 800; color: var(--txt) }
+.sec-check-item .m { margin-top: 4px; font-size: 11px; color: var(--txtL); line-height: 1.35 }
 
 /* ─── CMD VISUAL (tablet) ─── */
 .cmdv-grid { display: grid; grid-template-columns: 1.2fr .8fr; gap: 16px; align-items: start }
@@ -1177,6 +1184,7 @@ table.tbl tbody tr:hover { background: var(--acc-soft) }
       </div>
       <div id="securityMeta" class="muted" style="font-size:12px"></div>
     </div>
+    <div id="securityCheckBox" class="muted" style="margin-bottom:10px">Validando seguridad de nube...</div>
     <div class="toolbar" style="margin-bottom:10px">
       <button class="btn btn-o btn-sm" onclick="loadSecurityEvents()">Recargar</button>
       <span id="securityCounts" class="audit-pill">Cargando...</span>
@@ -2658,9 +2666,11 @@ async function loadConfig(){
     const box = $('#securityEventsBox');
     const meta = $('#securityMeta');
     const counts = $('#securityCounts');
+    const checkBox = $('#securityCheckBox');
     if(box) box.innerHTML = '<div class="muted">Solo admin puede ver esta seccion.</div>';
     if(meta) meta.textContent = '';
     if(counts) counts.textContent = 'Solo admin';
+    if(checkBox) checkBox.innerHTML = '<div class="muted">Solo admin puede ver esta seccion.</div>';
     return;
   }
   PARAMS=await api('/api/parametros');
@@ -2743,22 +2753,55 @@ function auditContextLines(ev){
   return lines.slice(0,5).map(esc).join('<br>') || '-';
 }
 
+function renderSecurityCheck(data){
+  const box = $('#securityCheckBox');
+  if(!box) return;
+  if(!data || data.ok===false){
+    box.innerHTML = `<div class="muted">No se pudo validar seguridad${data?.error ? `: ${esc(data.error)}` : ''}.</div>`;
+    return;
+  }
+  const checks = Array.isArray(data.checks) ? data.checks : [];
+  const summary = data.summary || {ok:0, fail:0, total:checks.length};
+  const rows = checks.map(c => `
+    <div class="sec-check-item ${c.ok ? 'ok' : 'fail'}">
+      <div class="t">${esc(c.label || c.id || 'check')}</div>
+      <div class="v">${c.ok ? 'OK' : 'FALTA AJUSTE'}</div>
+      <div class="m">${esc(String(c.value ?? ''))}</div>
+      ${!c.ok && c.recommendation ? `<div class="m">${esc(c.recommendation)}</div>` : ''}
+    </div>
+  `).join('');
+  box.innerHTML = `
+    <div class="audit-kpis" style="margin-bottom:8px">
+      <span class="audit-pill ok">OK ${summary.ok || 0}</span>
+      <span class="audit-pill ${summary.fail ? 'warn' : 'ok'}">Pendientes ${summary.fail || 0}</span>
+      <span class="audit-pill">Total ${summary.total || checks.length}</span>
+      <span class="audit-pill">Entorno ${data.env?.is_prod ? 'PROD' : 'LOCAL'}</span>
+    </div>
+    <div class="sec-check-grid">${rows || '<div class="muted">Sin checks.</div>'}</div>
+  `;
+}
+
 async function loadSecurityEvents(){
   const box = $('#securityEventsBox');
   const meta = $('#securityMeta');
   const counts = $('#securityCounts');
+  const checkBox = $('#securityCheckBox');
   if(!box) return;
   const role = String(ME?.role||'').toLowerCase();
   if(role !== 'admin'){
     SECURITY_EVENTS = [];
     if(meta) meta.textContent = '';
     if(counts) counts.textContent = 'Solo admin';
+    if(checkBox) checkBox.innerHTML = '<div class="muted">Solo admin puede ver esta seccion.</div>';
     box.innerHTML = '<div class="muted">Esta seccion es solo para admin.</div>';
     return;
   }
   box.innerHTML = '<div class="muted">Cargando auditoria...</div>';
+  if(checkBox) checkBox.innerHTML = '<div class="muted">Validando seguridad de nube...</div>'; 
   if(meta) meta.textContent = 'Leyendo ultimos eventos del sistema';
   if(counts) counts.textContent = 'Cargando...';
+  const c = await api('/api/admin/security_check');
+  renderSecurityCheck(c);
   const r = await api('/api/admin/security_events?limit=25');
   if(!r || r.ok===false){
     SECURITY_EVENTS = [];
