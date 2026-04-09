@@ -1174,6 +1174,7 @@ table.tbl tbody tr:hover { background: var(--acc-soft) }
 <!-- ═══ CONFIG ═══ -->
 <div class="page" id="pg-config">
   <div class="card"><h2>⚙ Parámetros</h2><div id="configForm"></div>
+  <div class="muted" style="font-size:11px;margin-top:6px">Los campos `security_*` se aplican en runtime. Si existe variable de entorno en servidor, esa tiene prioridad.</div>
   <button class="btn btn-p" onclick="saveConfig()" style="margin-top:8px">💾 Guardar</button></div>
 
   <div class="card" style="margin-top:14px">
@@ -2682,7 +2683,16 @@ async function loadConfig(){
     ['plazo_entrega','Plazo'],['garantia','Garantía'],['prefijo_cot','Prefijo cot.'],
     ['consecutivo','Consecutivo'],['forma_pago_default','Forma pago default'],
     ['anticipo_default','Anticipo default'],['meta_ventas_mes','Meta ventas mes (COP)'],
-    ['brand_primary','Color primario'],['brand_accent','Color acento']];
+    ['brand_primary','Color primario'],['brand_accent','Color acento'],
+    ['security_admin_ip_allowlist','Seguridad: IP admin allowlist (coma)'],
+    ['security_bot_ip_allowlist','Seguridad: IP bot allowlist (coma)'],
+    ['security_admin_reauth_seconds','Seguridad: reauth admin (segundos)'],
+    ['security_auto_backup_enabled','Seguridad: auto backup (1/0)'],
+    ['security_auto_backup_every_min','Seguridad: auto backup cada minutos'],
+    ['security_auto_backup_keep','Seguridad: backups a conservar'],
+    ['security_backup_max_age_hours','Seguridad: max edad backup (horas)'],
+    ['security_alert_webhook','Seguridad: webhook alertas'],
+    ['security_backup_webhook','Seguridad: webhook backup/restore']];
   $('#configForm').innerHTML=fs.map(([k,l])=>`<div class="fg"><label>${l}</label><input id="cfg_${k}" value="${PARAMS[k]||''}"></div>`).join('');
   await loadSecurityEvents();
 }

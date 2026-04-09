@@ -87,8 +87,8 @@ def _env_int(name: str, default: int, min_v=None, max_v=None) -> int:
         value = min(int(max_v), value)
     return value
 
-def _configured_ip_networks(env_name: str):
-    raw = (os.environ.get(env_name) or '').strip()
+def _parse_ip_networks(raw: str, source: str = ''):
+    raw = (raw or '').strip()
     if not raw:
         return []
     out = []
@@ -104,24 +104,146 @@ def _configured_ip_networks(env_name: str):
                 prefix = 32 if ip_obj.version == 4 else 128
                 out.append(ipaddress.ip_network(f'{token}/{prefix}', strict=False))
         except Exception:
-            print(f"[SECURITY] WARNING: IP/CIDR invalido en {env_name}: {token}")
+            if source:
+                print(f"[SECURITY] WARNING: IP/CIDR invalido en {source}: {token}")
     return out
 
-ADMIN_IP_ALLOWLIST = _configured_ip_networks('ADMIN_IP_ALLOWLIST')
-BOT_IP_ALLOWLIST = _configured_ip_networks('BOT_IP_ALLOWLIST')
-ADMIN_REAUTH_SECONDS = _env_int('ADMIN_REAUTH_SECONDS', 900 if IS_PROD else 0, min_v=0, max_v=86400)
-AUTO_BACKUP_ENABLED = _env_flag('AUTO_BACKUP_ENABLED', IS_PROD)
-AUTO_BACKUP_EVERY_MIN = _env_int('AUTO_BACKUP_EVERY_MIN', 360, min_v=15, max_v=10080)
-AUTO_BACKUP_KEEP = _env_int('AUTO_BACKUP_KEEP', 40 if IS_PROD else 12, min_v=3, max_v=500)
-SECURITY_BACKUP_MAX_AGE_HOURS = _env_int('SECURITY_BACKUP_MAX_AGE_HOURS', 24 if IS_PROD else 168, min_v=1, max_v=720)
-SECURITY_ALERT_WEBHOOK = (os.environ.get('SECURITY_ALERT_WEBHOOK') or '').strip()
-BACKUP_WEBHOOK_URL = (os.environ.get('BACKUP_WEBHOOK_URL') or '').strip()
+def _configured_ip_networks(env_name: str):
+    return _parse_ip_networks((os.environ.get(env_name) or '').strip(), source=env_name)
+
+ADMIN_IP_ALLOWLIST_DEFAULT = _configured_ip_networks('ADMIN_IP_ALLOWLIST')
+BOT_IP_ALLOWLIST_DEFAULT = _configured_ip_networks('BOT_IP_ALLOWLIST')
+ADMIN_REAUTH_SECONDS_DEFAULT = _env_int('ADMIN_REAUTH_SECONDS', 900 if IS_PROD else 0, min_v=0, max_v=86400)
+AUTO_BACKUP_ENABLED_DEFAULT = _env_flag('AUTO_BACKUP_ENABLED', IS_PROD)
+AUTO_BACKUP_EVERY_MIN_DEFAULT = _env_int('AUTO_BACKUP_EVERY_MIN', 360, min_v=15, max_v=10080)
+AUTO_BACKUP_KEEP_DEFAULT = _env_int('AUTO_BACKUP_KEEP', 40 if IS_PROD else 12, min_v=3, max_v=500)
+SECURITY_BACKUP_MAX_AGE_HOURS_DEFAULT = _env_int('SECURITY_BACKUP_MAX_AGE_HOURS', 24 if IS_PROD else 168, min_v=1, max_v=720)
+SECURITY_ALERT_WEBHOOK_DEFAULT = (os.environ.get('SECURITY_ALERT_WEBHOOK') or '').strip()
+BACKUP_WEBHOOK_URL_DEFAULT = (os.environ.get('BACKUP_WEBHOOK_URL') or '').strip()
 
 _AUTO_BACKUP_LOCK_PATH = os.path.join(BACKUP_DIR, '.auto_backup.lock')
 _AUTO_BACKUP_THREAD = None
 _AUTO_BACKUP_THREAD_LOCK = threading.Lock()
 _ALERT_LOCK = threading.Lock()
 _ALERT_LAST_SENT = {}
+_SEC_SETTINGS_LOCK = threading.Lock()
+_SEC_SETTINGS_CACHE = {'ts': 0.0, 'data': None}
+
+_SECURITY_PARAM_KEYS = (
+    'security_admin_ip_allowlist',
+    'security_bot_ip_allowlist',
+    'security_admin_reauth_seconds',
+    'security_auto_backup_enabled',
+    'security_auto_backup_every_min',
+    'security_auto_backup_keep',
+    'security_backup_max_age_hours',
+    'security_alert_webhook',
+    'security_backup_webhook',
+)
+
+def _coerce_int(value, default: int, min_v=None, max_v=None) -> int:
+    try:
+        out = int(str(value).strip())
+    except Exception:
+        out = int(default)
+    if min_v is not None:
+        out = max(int(min_v), out)
+    if max_v is not None:
+        out = min(int(max_v), out)
+    return out
+
+def _coerce_bool(value, default=False) -> bool:
+    if value is None:
+        return bool(default)
+    s = str(value).strip().lower()
+    if s in ('1', 'true', 'yes', 'on', 'si', 'sí'):
+        return True
+    if s in ('0', 'false', 'no', 'off'):
+        return False
+    return bool(default)
+
+def _load_security_param_overrides(force=False, max_age_seconds=20):
+    now = time.time()
+    if (not force) and _SEC_SETTINGS_CACHE.get('data') is not None and (now - float(_SEC_SETTINGS_CACHE.get('ts') or 0) < max_age_seconds):
+        return dict(_SEC_SETTINGS_CACHE.get('data') or {})
+    with _SEC_SETTINGS_LOCK:
+        if (not force) and _SEC_SETTINGS_CACHE.get('data') is not None and (time.time() - float(_SEC_SETTINGS_CACHE.get('ts') or 0) < max_age_seconds):
+            return dict(_SEC_SETTINGS_CACHE.get('data') or {})
+        out = {}
+        try:
+            if os.path.isfile(DB_PATH):
+                conn = sqlite3.connect(DB_PATH)
+                try:
+                    cur = conn.cursor()
+                    marks = ','.join(['?'] * len(_SECURITY_PARAM_KEYS))
+                    rows = cur.execute(f"SELECT clave, valor FROM parametros WHERE clave IN ({marks})", _SECURITY_PARAM_KEYS).fetchall()
+                    for k, v in rows:
+                        out[str(k)] = '' if v is None else str(v)
+                finally:
+                    conn.close()
+        except Exception:
+            out = {}
+        _SEC_SETTINGS_CACHE['ts'] = time.time()
+        _SEC_SETTINGS_CACHE['data'] = dict(out)
+        return dict(out)
+
+def _runtime_security_settings(force=False):
+    over = _load_security_param_overrides(force=force)
+
+    def env_text(name):
+        if name in os.environ:
+            return str(os.environ.get(name) or '').strip(), True
+        return '', False
+
+    def pick_text(env_name, param_key, default=''):
+        e, has_env = env_text(env_name)
+        if has_env:
+            return e
+        p = str(over.get(param_key) or '').strip()
+        return p if p else str(default or '').strip()
+
+    def pick_int(env_name, param_key, default, min_v=None, max_v=None):
+        if env_name in os.environ:
+            return _coerce_int(os.environ.get(env_name), default, min_v=min_v, max_v=max_v)
+        p = over.get(param_key)
+        if p is None or str(p).strip() == '':
+            return _coerce_int(default, default, min_v=min_v, max_v=max_v)
+        return _coerce_int(p, default, min_v=min_v, max_v=max_v)
+
+    def pick_bool(env_name, param_key, default=False):
+        if env_name in os.environ:
+            return _coerce_bool(os.environ.get(env_name), default=default)
+        p = over.get(param_key)
+        if p is None or str(p).strip() == '':
+            return bool(default)
+        return _coerce_bool(p, default=default)
+
+    admin_ip_raw = pick_text('ADMIN_IP_ALLOWLIST', 'security_admin_ip_allowlist', '')
+    bot_ip_raw = pick_text('BOT_IP_ALLOWLIST', 'security_bot_ip_allowlist', '')
+    admin_ip_allowlist = _parse_ip_networks(admin_ip_raw, source='runtime_admin_ip_allowlist') if admin_ip_raw else list(ADMIN_IP_ALLOWLIST_DEFAULT)
+    bot_ip_allowlist = _parse_ip_networks(bot_ip_raw, source='runtime_bot_ip_allowlist') if bot_ip_raw else list(BOT_IP_ALLOWLIST_DEFAULT)
+
+    admin_reauth_seconds = pick_int('ADMIN_REAUTH_SECONDS', 'security_admin_reauth_seconds', ADMIN_REAUTH_SECONDS_DEFAULT, min_v=0, max_v=86400)
+    auto_backup_enabled = pick_bool('AUTO_BACKUP_ENABLED', 'security_auto_backup_enabled', AUTO_BACKUP_ENABLED_DEFAULT)
+    auto_backup_every_min = pick_int('AUTO_BACKUP_EVERY_MIN', 'security_auto_backup_every_min', AUTO_BACKUP_EVERY_MIN_DEFAULT, min_v=15, max_v=10080)
+    auto_backup_keep = pick_int('AUTO_BACKUP_KEEP', 'security_auto_backup_keep', AUTO_BACKUP_KEEP_DEFAULT, min_v=3, max_v=500)
+    backup_max_age_hours = pick_int('SECURITY_BACKUP_MAX_AGE_HOURS', 'security_backup_max_age_hours', SECURITY_BACKUP_MAX_AGE_HOURS_DEFAULT, min_v=1, max_v=720)
+    security_alert_webhook = pick_text('SECURITY_ALERT_WEBHOOK', 'security_alert_webhook', SECURITY_ALERT_WEBHOOK_DEFAULT)
+    backup_webhook = pick_text('BACKUP_WEBHOOK_URL', 'security_backup_webhook', BACKUP_WEBHOOK_URL_DEFAULT)
+
+    return {
+        'admin_ip_allowlist': admin_ip_allowlist,
+        'admin_ip_allowlist_count': len(admin_ip_allowlist),
+        'bot_ip_allowlist': bot_ip_allowlist,
+        'bot_ip_allowlist_count': len(bot_ip_allowlist),
+        'admin_reauth_seconds': int(admin_reauth_seconds),
+        'auto_backup_enabled': bool(auto_backup_enabled),
+        'auto_backup_every_min': int(auto_backup_every_min),
+        'auto_backup_keep': int(auto_backup_keep),
+        'backup_max_age_hours': int(backup_max_age_hours),
+        'security_alert_webhook': str(security_alert_webhook or '').strip(),
+        'backup_webhook': str(backup_webhook or '').strip(),
+    }
 
 def _maybe_migrate_legacy_db():
     """Si cambió DB_PATH a ruta persistente, copia la BD legacy una sola vez."""
@@ -147,7 +269,21 @@ def snapshot_db(reason: str = 'manual'):
     ts = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
     safe_reason = re.sub(r'[^a-zA-Z0-9_-]+', '_', reason or 'manual').strip('_') or 'manual'
     out = os.path.join(BACKUP_DIR, f'rc_domotic_{safe_reason}_{ts}.db')
-    shutil.copy2(DB_PATH, out)
+    # Backup consistente aun con escrituras concurrentes.
+    src = sqlite3.connect(DB_PATH)
+    try:
+        dst = sqlite3.connect(out)
+        try:
+            src.backup(dst)
+            dst.commit()
+        finally:
+            dst.close()
+    finally:
+        src.close()
+    try:
+        shutil.copystat(DB_PATH, out)
+    except Exception:
+        pass
     return out
 
 def _db_counts_from_file(path: str):
@@ -289,10 +425,15 @@ def _release_file_lock(lock_path: str, fd):
         pass
 
 def _run_auto_backup_once(force=False):
-    if not AUTO_BACKUP_ENABLED:
+    sec = _runtime_security_settings()
+    if (not sec.get('auto_backup_enabled')) and (not force):
         return {'ok': False, 'skipped': 'disabled'}
 
-    lock_fd = _acquire_file_lock(_AUTO_BACKUP_LOCK_PATH, stale_seconds=max(3600, AUTO_BACKUP_EVERY_MIN * 120))
+    every_min = int(sec.get('auto_backup_every_min') or AUTO_BACKUP_EVERY_MIN_DEFAULT)
+    keep_n = int(sec.get('auto_backup_keep') or AUTO_BACKUP_KEEP_DEFAULT)
+    webhook = str(sec.get('backup_webhook') or '').strip()
+
+    lock_fd = _acquire_file_lock(_AUTO_BACKUP_LOCK_PATH, stale_seconds=max(3600, every_min * 120))
     if lock_fd is None:
         return {'ok': True, 'skipped': 'locked'}
 
@@ -300,7 +441,7 @@ def _run_auto_backup_once(force=False):
         latest = _latest_backup_info()
         if latest and not force:
             age_s = time.time() - float(latest.get('mtime') or 0)
-            if age_s < (AUTO_BACKUP_EVERY_MIN * 60):
+            if age_s < (every_min * 60):
                 return {'ok': True, 'skipped': 'not_due', 'age_seconds': int(age_s)}
 
         out = snapshot_db('auto')
@@ -309,7 +450,7 @@ def _run_auto_backup_once(force=False):
             return {'ok': False, 'error': 'db_missing'}
 
         verify = _verify_sqlite_file(out)
-        removed = _prune_backup_files(AUTO_BACKUP_KEEP)
+        removed = _prune_backup_files(keep_n)
         meta = {
             'path': os.path.abspath(out),
             'name': os.path.basename(out),
@@ -325,8 +466,8 @@ def _run_auto_backup_once(force=False):
             integrity=verify.get('integrity'),
             removed_old=removed,
         )
-        if BACKUP_WEBHOOK_URL:
-            _post_json_webhook_async(BACKUP_WEBHOOK_URL, {
+        if webhook:
+            _post_json_webhook_async(webhook, {
                 'event': 'auto_backup',
                 'ok': bool(verify.get('ok')),
                 'backup': meta,
@@ -347,8 +488,6 @@ def _auto_backup_worker():
 
 def _ensure_auto_backup_thread():
     global _AUTO_BACKUP_THREAD
-    if not AUTO_BACKUP_ENABLED:
-        return
     if _AUTO_BACKUP_THREAD and _AUTO_BACKUP_THREAD.is_alive():
         return
     with _AUTO_BACKUP_THREAD_LOCK:
@@ -491,7 +630,8 @@ def _verify_current_user_password(pw: str) -> bool:
     return verify_password(row.get('password_hash') or '', pw or '')
 
 def _admin_reauth_is_recent(valid_for_seconds=None) -> bool:
-    max_age = ADMIN_REAUTH_SECONDS if valid_for_seconds is None else int(valid_for_seconds)
+    sec = _runtime_security_settings()
+    max_age = int(sec.get('admin_reauth_seconds') or 0) if valid_for_seconds is None else int(valid_for_seconds)
     if max_age <= 0:
         return True
     try:
@@ -572,7 +712,9 @@ def _should_send_security_alert(payload: dict) -> bool:
     return False
 
 def _maybe_send_security_alert(payload: dict):
-    if not SECURITY_ALERT_WEBHOOK:
+    sec = _runtime_security_settings()
+    webhook = str(sec.get('security_alert_webhook') or '').strip()
+    if not webhook:
         return
     if not _should_send_security_alert(payload):
         return
@@ -584,7 +726,7 @@ def _maybe_send_security_alert(payload: dict):
         if now - last < 15:
             return
         _ALERT_LAST_SENT[key] = now
-    _post_json_webhook_async(SECURITY_ALERT_WEBHOOK, {'event': 'security_alert', 'payload': payload}, timeout=5)
+    _post_json_webhook_async(webhook, {'event': 'security_alert', 'payload': payload}, timeout=5)
 
 def _audit_event(action, outcome='ok', actor=None, **details):
     try:
@@ -754,9 +896,11 @@ def _enforce_ip_allowlist(scope: str, networks, actor=None):
     return jsonify({'ok': False, 'error': 'IP no autorizada para esta ruta'}), 403
 
 def _require_admin_reauth_for_action(data, target_action='admin_action'):
-    if ADMIN_REAUTH_SECONDS <= 0:
+    sec = _runtime_security_settings()
+    reauth_seconds = int(sec.get('admin_reauth_seconds') or 0)
+    if reauth_seconds <= 0:
         return None
-    if _admin_reauth_is_recent(ADMIN_REAUTH_SECONDS):
+    if _admin_reauth_is_recent(reauth_seconds):
         return None
     data = data or {}
     pw = str(data.get('admin_password') or data.get('password') or '').strip()
@@ -766,7 +910,7 @@ def _require_admin_reauth_for_action(data, target_action='admin_action'):
             'ok': False,
             'error': 'Se requiere confirmacion de contrasena admin para esta accion.',
             'code': 'admin_reauth_required',
-            'valid_for_seconds': ADMIN_REAUTH_SECONDS,
+            'valid_for_seconds': reauth_seconds,
         }), 401
     if not _verify_current_user_password(pw):
         _audit_event('db_restore_reauth_failed', outcome='rejected', actor=current_user(), reason='invalid_password', action_name=target_action)
@@ -774,10 +918,10 @@ def _require_admin_reauth_for_action(data, target_action='admin_action'):
             'ok': False,
             'error': 'Contrasena admin invalida.',
             'code': 'admin_reauth_invalid',
-            'valid_for_seconds': ADMIN_REAUTH_SECONDS,
+            'valid_for_seconds': reauth_seconds,
         }), 401
     _mark_admin_reauth_ok()
-    _audit_event('admin_reauth', actor=current_user(), source='inline', action_name=target_action, valid_for_seconds=ADMIN_REAUTH_SECONDS)
+    _audit_event('admin_reauth', actor=current_user(), source='inline', action_name=target_action, valid_for_seconds=reauth_seconds)
     return None
 
 
@@ -789,8 +933,9 @@ def _enforce_auth_for_api():
     p = request.path or ''
     if not p.startswith('/api/'):
         return
+    sec = _runtime_security_settings()
     if p.startswith('/api/admin/'):
-        ip_err = _enforce_ip_allowlist('admin', ADMIN_IP_ALLOWLIST, actor=current_user() or {'type': 'anonymous'})
+        ip_err = _enforce_ip_allowlist('admin', sec.get('admin_ip_allowlist') or [], actor=current_user() or {'type': 'anonymous'})
         if ip_err:
             return ip_err
     if p in PUBLIC_API_WHITELIST:
@@ -800,7 +945,7 @@ def _enforce_auth_for_api():
         return
     # bot endpoints se autentican con X-Bot-Key, no con sesiÃ³n
     if p.startswith('/api/bot/'):
-        ip_err = _enforce_ip_allowlist('bot', BOT_IP_ALLOWLIST, actor={'type': 'bot'})
+        ip_err = _enforce_ip_allowlist('bot', sec.get('bot_ip_allowlist') or [], actor={'type': 'bot'})
         if ip_err:
             return ip_err
         return
@@ -1089,7 +1234,18 @@ PARAMS_DATA = [
     ('watermark_path', '/static/watermark.png'),
     ('brand_primary', '#0F0F0F'),
     ('brand_surface', '#111111'),
-    ('brand_accent', '#25D366'),]
+    ('brand_accent', '#25D366'),
+    # Seguridad configurable desde la app (si no existe variable de entorno).
+    ('security_admin_ip_allowlist', ''),
+    ('security_bot_ip_allowlist', ''),
+    ('security_admin_reauth_seconds', str(ADMIN_REAUTH_SECONDS_DEFAULT)),
+    ('security_auto_backup_enabled', '1' if AUTO_BACKUP_ENABLED_DEFAULT else '0'),
+    ('security_auto_backup_every_min', str(AUTO_BACKUP_EVERY_MIN_DEFAULT)),
+    ('security_auto_backup_keep', str(AUTO_BACKUP_KEEP_DEFAULT)),
+    ('security_backup_max_age_hours', str(SECURITY_BACKUP_MAX_AGE_HOURS_DEFAULT)),
+    ('security_alert_webhook', ''),
+    ('security_backup_webhook', ''),
+]
 
 RECOVERY_GILBERTO_QUOTE = {
     'no_cotizacion': 'A05-00060',
@@ -1916,6 +2072,8 @@ def api_change_password():
 @limit('20 per hour')
 def api_admin_reauth():
     d = request.json or {}
+    sec = _runtime_security_settings()
+    reauth_seconds = int(sec.get('admin_reauth_seconds') or 0)
     pw = str(d.get('password') or d.get('admin_password') or '').strip()
     if not pw:
         _audit_event('admin_reauth_failed', outcome='rejected', actor=current_user(), reason='password_required')
@@ -1924,8 +2082,8 @@ def api_admin_reauth():
         _audit_event('admin_reauth_failed', outcome='rejected', actor=current_user(), reason='invalid_password')
         return jsonify({'ok': False, 'error': 'Contrasena invalida'}), 401
     _mark_admin_reauth_ok()
-    _audit_event('admin_reauth', actor=current_user(), source='explicit', valid_for_seconds=ADMIN_REAUTH_SECONDS)
-    return jsonify({'ok': True, 'valid_for_seconds': ADMIN_REAUTH_SECONDS})
+    _audit_event('admin_reauth', actor=current_user(), source='explicit', valid_for_seconds=reauth_seconds)
+    return jsonify({'ok': True, 'valid_for_seconds': reauth_seconds})
 
 
 @app.get('/api/catalogo')
@@ -2605,6 +2763,7 @@ def get_parametros():
 @role_required('admin')
 def api_db_status():
     try:
+        sec = _runtime_security_settings(force=True)
         cot_count = query("SELECT COUNT(*) as n FROM cotizaciones", one=True)['n']
         item_count = query("SELECT COUNT(*) as n FROM items", one=True)['n']
         backups = _list_backups(limit=20)
@@ -2625,10 +2784,10 @@ def api_db_status():
             'latest_backup': latest,
             'latest_backup_verify': latest_verify,
             'auto_backup': {
-                'enabled': bool(AUTO_BACKUP_ENABLED),
-                'every_min': int(AUTO_BACKUP_EVERY_MIN),
-                'keep': int(AUTO_BACKUP_KEEP),
-                'max_age_hours': int(SECURITY_BACKUP_MAX_AGE_HOURS),
+                'enabled': bool(sec.get('auto_backup_enabled')),
+                'every_min': int(sec.get('auto_backup_every_min') or 0),
+                'keep': int(sec.get('auto_backup_keep') or 0),
+                'max_age_hours': int(sec.get('backup_max_age_hours') or 0),
             },
         })
     except Exception as e:
@@ -2639,6 +2798,7 @@ def api_db_status():
 def api_security_check():
     """Checklist de hardening y persistencia para validar la nube con evidencia."""
     try:
+        sec = _runtime_security_settings(force=True)
         now_utc = datetime.datetime.utcnow().replace(microsecond=0).isoformat() + 'Z'
         secret = app.secret_key or ''
         data_dir_abs = os.path.abspath(DATA_DIR)
@@ -2649,10 +2809,10 @@ def api_security_check():
         latest_backup = _latest_backup_info()
         latest_verify = _verify_sqlite_file(latest_backup['path']) if latest_backup else {'ok': False, 'integrity': 'missing'}
         latest_age_s = max(0, int(time.time() - int(latest_backup.get('mtime') or 0))) if latest_backup else None
-        max_age_s = int(SECURITY_BACKUP_MAX_AGE_HOURS * 3600)
-        has_security_webhook = bool(SECURITY_ALERT_WEBHOOK)
-        has_backup_webhook = bool(BACKUP_WEBHOOK_URL)
-        auto_thread_ok = bool(_AUTO_BACKUP_THREAD and _AUTO_BACKUP_THREAD.is_alive()) if AUTO_BACKUP_ENABLED else True
+        max_age_s = int((sec.get('backup_max_age_hours') or 0) * 3600)
+        has_security_webhook = bool(str(sec.get('security_alert_webhook') or '').strip())
+        has_backup_webhook = bool(str(sec.get('backup_webhook') or '').strip())
+        auto_thread_ok = bool(_AUTO_BACKUP_THREAD and _AUTO_BACKUP_THREAD.is_alive()) if bool(sec.get('auto_backup_enabled')) else True
 
         events = _read_audit_tail(300)
         now_dt = datetime.datetime.utcnow()
@@ -2793,29 +2953,33 @@ def api_security_check():
         add(
             'admin_ip_allowlist',
             'Allowlist IP para rutas admin',
-            (len(ADMIN_IP_ALLOWLIST) > 0) if IS_PROD else True,
-            value=len(ADMIN_IP_ALLOWLIST),
+            (int(sec.get('admin_ip_allowlist_count') or 0) > 0) if IS_PROD else True,
+            value=int(sec.get('admin_ip_allowlist_count') or 0),
             recommendation='Configurar ADMIN_IP_ALLOWLIST con IP(s)/CIDR de acceso admin.'
         )
         add(
             'bot_ip_allowlist',
             'Allowlist IP para rutas bot',
-            (len(BOT_IP_ALLOWLIST) > 0) if IS_PROD else True,
-            value=len(BOT_IP_ALLOWLIST),
+            (int(sec.get('bot_ip_allowlist_count') or 0) > 0) if IS_PROD else True,
+            value=int(sec.get('bot_ip_allowlist_count') or 0),
             recommendation='Configurar BOT_IP_ALLOWLIST para restringir peticiones del bot.'
         )
         add(
             'admin_reauth_enabled',
             'Reautenticacion admin para restaurar base',
-            ADMIN_REAUTH_SECONDS > 0,
-            value=ADMIN_REAUTH_SECONDS,
+            int(sec.get('admin_reauth_seconds') or 0) > 0,
+            value=int(sec.get('admin_reauth_seconds') or 0),
             recommendation='Definir ADMIN_REAUTH_SECONDS (recomendado 600-1800).'
         )
         add(
             'auto_backup_enabled',
             'Backup automatico habilitado',
-            bool(AUTO_BACKUP_ENABLED),
-            value={'enabled': bool(AUTO_BACKUP_ENABLED), 'every_min': int(AUTO_BACKUP_EVERY_MIN), 'keep': int(AUTO_BACKUP_KEEP)},
+            bool(sec.get('auto_backup_enabled')),
+            value={
+                'enabled': bool(sec.get('auto_backup_enabled')),
+                'every_min': int(sec.get('auto_backup_every_min') or 0),
+                'keep': int(sec.get('auto_backup_keep') or 0)
+            },
             recommendation='Activar AUTO_BACKUP_ENABLED y revisar frecuencia.'
         )
         add(
@@ -2834,7 +2998,7 @@ def api_security_check():
         )
         add(
             'latest_backup_fresh',
-            f'Backup reciente (<={SECURITY_BACKUP_MAX_AGE_HOURS}h)',
+            f"Backup reciente (<={int(sec.get('backup_max_age_hours') or 0)}h)",
             bool(latest_backup and latest_age_s is not None and latest_age_s <= max_age_s),
             value={'age_seconds': latest_age_s, 'max_age_seconds': max_age_s},
             recommendation='Reducir AUTO_BACKUP_EVERY_MIN o generar backup manual ahora.'
@@ -2882,13 +3046,13 @@ def api_security_check():
                 'backup_dir': backup_dir_abs,
                 'audit_log_path': audit_path_abs,
                 'max_upload_bytes': int(app.config.get('MAX_CONTENT_LENGTH') or 0),
-                'admin_ip_allowlist': len(ADMIN_IP_ALLOWLIST),
-                'bot_ip_allowlist': len(BOT_IP_ALLOWLIST),
-                'admin_reauth_seconds': int(ADMIN_REAUTH_SECONDS),
-                'auto_backup_enabled': bool(AUTO_BACKUP_ENABLED),
-                'auto_backup_every_min': int(AUTO_BACKUP_EVERY_MIN),
-                'auto_backup_keep': int(AUTO_BACKUP_KEEP),
-                'security_backup_max_age_hours': int(SECURITY_BACKUP_MAX_AGE_HOURS),
+                'admin_ip_allowlist': int(sec.get('admin_ip_allowlist_count') or 0),
+                'bot_ip_allowlist': int(sec.get('bot_ip_allowlist_count') or 0),
+                'admin_reauth_seconds': int(sec.get('admin_reauth_seconds') or 0),
+                'auto_backup_enabled': bool(sec.get('auto_backup_enabled')),
+                'auto_backup_every_min': int(sec.get('auto_backup_every_min') or 0),
+                'auto_backup_keep': int(sec.get('auto_backup_keep') or 0),
+                'security_backup_max_age_hours': int(sec.get('backup_max_age_hours') or 0),
                 'security_alert_webhook': has_security_webhook,
                 'backup_webhook': has_backup_webhook,
                 'latest_backup': latest_backup,
@@ -2908,12 +3072,13 @@ def api_security_check():
 @role_required('admin')
 def api_db_backup():
     try:
+        sec = _runtime_security_settings(force=True)
         out = snapshot_db('admin')
         if not out:
             _audit_event('db_backup', outcome='rejected', reason='no_database_available')
             return jsonify({'ok': False, 'error': 'No existe base para respaldar'}), 404
         verify = _verify_sqlite_file(out)
-        removed = _prune_backup_files(AUTO_BACKUP_KEEP)
+        removed = _prune_backup_files(int(sec.get('auto_backup_keep') or AUTO_BACKUP_KEEP_DEFAULT))
         size = os.path.getsize(out) if os.path.isfile(out) else 0
         _audit_event(
             'db_backup',
@@ -2925,8 +3090,8 @@ def api_db_backup():
             integrity=verify.get('integrity'),
             removed_old=removed,
         )
-        if BACKUP_WEBHOOK_URL:
-            _post_json_webhook_async(BACKUP_WEBHOOK_URL, {
+        if str(sec.get('backup_webhook') or '').strip():
+            _post_json_webhook_async(str(sec.get('backup_webhook') or '').strip(), {
                 'event': 'manual_backup',
                 'ok': bool(verify.get('ok')),
                 'backup': {'name': os.path.basename(out), 'path': out, 'size': size},
@@ -3000,12 +3165,14 @@ def api_db_scan():
 @role_required('admin')
 def api_backup_verify():
     try:
+        sec = _runtime_security_settings(force=True)
         latest = _latest_backup_info()
         if not latest:
             _audit_event('backup_verify', outcome='rejected', actor=current_user(), reason='no_backups')
             return jsonify({'ok': False, 'error': 'No hay backups disponibles'}), 404
         verify = _verify_sqlite_file(latest['path'])
         age_seconds = max(0, int(time.time() - int(latest.get('mtime') or 0)))
+        max_age_seconds = int((sec.get('backup_max_age_hours') or SECURITY_BACKUP_MAX_AGE_HOURS_DEFAULT) * 3600)
         _audit_event(
             'backup_verify',
             outcome='ok' if verify.get('ok') else 'error',
@@ -3019,8 +3186,8 @@ def api_backup_verify():
             'backup': latest,
             'verify': verify,
             'age_seconds': age_seconds,
-            'max_age_seconds': int(SECURITY_BACKUP_MAX_AGE_HOURS * 3600),
-            'fresh': age_seconds <= int(SECURITY_BACKUP_MAX_AGE_HOURS * 3600),
+            'max_age_seconds': max_age_seconds,
+            'fresh': age_seconds <= max_age_seconds,
         })
     except Exception as e:
         _audit_event('backup_verify', outcome='error', actor=current_user(), error=str(e))
@@ -3030,6 +3197,7 @@ def api_backup_verify():
 @role_required('admin')
 def api_db_restore():
     try:
+        sec = _runtime_security_settings(force=True)
         data = request.json or {}
         reauth_err = _require_admin_reauth_for_action(data, target_action='db_restore')
         if reauth_err:
@@ -3050,7 +3218,16 @@ def api_db_restore():
         cot_count, item_count = _db_counts_from_file(src)
         backup_prev = snapshot_db('pre_restore')
         os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
-        shutil.copy2(src, DB_PATH)
+        src_conn = sqlite3.connect(src)
+        try:
+            dst_conn = sqlite3.connect(DB_PATH)
+            try:
+                src_conn.backup(dst_conn)
+                dst_conn.commit()
+            finally:
+                dst_conn.close()
+        finally:
+            src_conn.close()
         restored_verify = _verify_sqlite_file(DB_PATH)
         _audit_event(
             'db_restore',
@@ -3062,8 +3239,8 @@ def api_db_restore():
             source_integrity=source_verify.get('integrity'),
             restored_integrity=restored_verify.get('integrity'),
         )
-        if BACKUP_WEBHOOK_URL:
-            _post_json_webhook_async(BACKUP_WEBHOOK_URL, {
+        if str(sec.get('backup_webhook') or '').strip():
+            _post_json_webhook_async(str(sec.get('backup_webhook') or '').strip(), {
                 'event': 'db_restore',
                 'ok': bool(restored_verify.get('ok')),
                 'source': src,
@@ -3104,6 +3281,12 @@ def api_security_events():
 def update_parametros():
     for k, v in request.json.items():
         execute("INSERT OR REPLACE INTO parametros (clave, valor) VALUES (?,?)", (k, str(v)))
+    # Refresca cache de seguridad cuando cambian parametros.
+    try:
+        _SEC_SETTINGS_CACHE['ts'] = 0.0
+        _SEC_SETTINGS_CACHE['data'] = None
+    except Exception:
+        pass
     return jsonify({'ok': True})
 
 
