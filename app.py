@@ -384,6 +384,8 @@ def _prune_backup_files(keep_n: int):
 def _post_json_webhook_async(url: str, payload: dict, timeout=6):
     if not url:
         return
+    if str(url).strip().lower().startswith('internal://'):
+        return
     body = json.dumps(payload, ensure_ascii=False).encode('utf-8')
     headers = {'Content-Type': 'application/json; charset=utf-8'}
     def _worker():
