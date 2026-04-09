@@ -3090,10 +3090,10 @@ def api_security_quick_harden():
         if not str(current.get('backup_webhook') or '').strip():
             updates['security_backup_webhook'] = 'internal://audit'
 
-        if not str(current.get('admin_ip_allowlist_count') or 0) and ip_cidr:
+        if int(current.get('admin_ip_allowlist_count') or 0) <= 0 and ip_cidr:
             updates['security_admin_ip_allowlist'] = ip_cidr
 
-        if not str(current.get('bot_ip_allowlist_count') or 0):
+        if int(current.get('bot_ip_allowlist_count') or 0) <= 0:
             bot_ips = []
             for ev in _read_audit_tail(800):
                 try:
@@ -3122,6 +3122,8 @@ def api_security_quick_harden():
                 _SEC_SETTINGS_CACHE['data'] = None
             except Exception:
                 pass
+            # Si auto-backup quedó habilitado por parámetros, inicia el worker.
+            _ensure_auto_backup_thread()
 
         updated = _runtime_security_settings(force=True)
         _audit_event('security_quick_harden', actor=current_user(), changed=list(updates.keys()), current_ip=ip, applied=bool(updates))
@@ -3448,6 +3450,7 @@ def update_parametros():
         _SEC_SETTINGS_CACHE['data'] = None
     except Exception:
         pass
+    _ensure_auto_backup_thread()
     return jsonify({'ok': True})
 
 
