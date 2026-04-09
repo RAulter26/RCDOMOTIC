@@ -1188,6 +1188,7 @@ table.tbl tbody tr:hover { background: var(--acc-soft) }
     <div id="securityCheckBox" class="muted" style="margin-bottom:10px">Validando seguridad de nube...</div>
     <div class="toolbar" style="margin-bottom:10px">
       <button class="btn btn-o btn-sm" onclick="loadSecurityEvents()">Recargar</button>
+      <button class="btn btn-o btn-sm" onclick="runQuickHarden()">Blindaje rapido</button>
       <button class="btn btn-o btn-sm" onclick="downloadBackupFile()">Descargar backup</button>
       <button class="btn btn-o btn-sm" onclick="runBackupVerify()">Verificar backup</button>
       <button class="btn btn-o btn-sm" onclick="runAutoBackupNow()">Forzar auto backup</button>
@@ -2784,7 +2785,7 @@ function renderSecurityCheck(data){
     <div class="sec-check-item ${c.ok ? 'ok' : 'fail'}">
       <div class="t">${esc(c.label || c.id || 'check')}</div>
       <div class="v">${c.ok ? 'OK' : 'FALTA AJUSTE'}</div>
-      <div class="m">${esc(String(c.value ?? ''))}</div>
+      <div class="m">${esc((c&&c.value!==undefined&&c.value!==null&&typeof c.value==='object')?JSON.stringify(c.value):String(c?.value ?? ''))}</div>
       ${!c.ok && c.recommendation ? `<div class="m">${esc(c.recommendation)}</div>` : ''}
     </div>
   `).join('');
@@ -2811,6 +2812,19 @@ async function runBackupVerify(){
   const age = Number(r.age_seconds||0);
   const ageTxt = age > 0 ? `${Math.round(age/60)} min` : '0 min';
   toast(v.ok ? `Backup OK (${ageTxt})` : `Backup con alerta (${ageTxt})`);
+  await loadSecurityEvents();
+}
+
+async function runQuickHarden(){
+  const role = String(ME?.role||'').toLowerCase();
+  if(role !== 'admin'){ toast('Solo admin'); return; }
+  const r = await api('/api/admin/security_quick_harden', {method:'POST', body:{}});
+  if(!r || r.ok===false){
+    toast('No se pudo aplicar blindaje rapido');
+    return;
+  }
+  const n = Array.isArray(r.updated_keys) ? r.updated_keys.length : 0;
+  toast(n ? `Blindaje aplicado (${n} ajustes)` : 'Blindaje ya estaba aplicado');
   await loadSecurityEvents();
 }
 

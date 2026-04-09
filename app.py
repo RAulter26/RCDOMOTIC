@@ -3070,6 +3070,75 @@ def api_security_check():
     except Exception as e:
         return jsonify({'ok': False, 'error': str(e)}), 500
 
+@app.post('/api/admin/security_quick_harden')
+@role_required('admin')
+def api_security_quick_harden():
+    """Aplica ajustes de seguridad recomendados en un solo paso (sin tocar datos)."""
+    try:
+        current = _runtime_security_settings(force=True)
+        updates = {}
+
+        ip = _client_ip().strip()
+        try:
+            ip_obj = ipaddress.ip_address(ip)
+            ip_cidr = f"{ip}/{32 if ip_obj.version == 4 else 128}"
+        except Exception:
+            ip_cidr = ''
+
+        if not str(current.get('security_alert_webhook') or '').strip():
+            updates['security_alert_webhook'] = 'internal://audit'
+        if not str(current.get('backup_webhook') or '').strip():
+            updates['security_backup_webhook'] = 'internal://audit'
+
+        if not str(current.get('admin_ip_allowlist_count') or 0) and ip_cidr:
+            updates['security_admin_ip_allowlist'] = ip_cidr
+
+        if not str(current.get('bot_ip_allowlist_count') or 0):
+            bot_ips = []
+            for ev in _read_audit_tail(800):
+                try:
+                    p = str(ev.get('path') or '')
+                    out = str(ev.get('outcome') or '').lower()
+                    ev_ip = str(ev.get('ip') or '').strip()
+                    if not p.startswith('/api/bot/') or out != 'ok' or not ev_ip:
+                        continue
+                    ip_o = ipaddress.ip_address(ev_ip)
+                    cidr = f"{ev_ip}/{32 if ip_o.version == 4 else 128}"
+                    if cidr not in bot_ips:
+                        bot_ips.append(cidr)
+                except Exception:
+                    continue
+            if bot_ips:
+                updates['security_bot_ip_allowlist'] = ','.join(bot_ips[:5])
+            elif ip_cidr:
+                # Fallback seguro: limita bot a la misma IP actual hasta definir IP final de n8n.
+                updates['security_bot_ip_allowlist'] = ip_cidr
+
+        if updates:
+            for k, v in updates.items():
+                execute("INSERT OR REPLACE INTO parametros (clave, valor) VALUES (?,?)", (k, str(v)))
+            try:
+                _SEC_SETTINGS_CACHE['ts'] = 0.0
+                _SEC_SETTINGS_CACHE['data'] = None
+            except Exception:
+                pass
+
+        updated = _runtime_security_settings(force=True)
+        _audit_event('security_quick_harden', actor=current_user(), changed=list(updates.keys()), current_ip=ip, applied=bool(updates))
+        return jsonify({
+            'ok': True,
+            'updated_keys': list(updates.keys()),
+            'settings': {
+                'admin_ip_allowlist_count': int(updated.get('admin_ip_allowlist_count') or 0),
+                'bot_ip_allowlist_count': int(updated.get('bot_ip_allowlist_count') or 0),
+                'security_alert_webhook': bool(str(updated.get('security_alert_webhook') or '').strip()),
+                'backup_webhook': bool(str(updated.get('backup_webhook') or '').strip()),
+            }
+        })
+    except Exception as e:
+        _audit_event('security_quick_harden', outcome='error', actor=current_user(), error=str(e))
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
 @app.post('/api/admin/db_backup')
 @role_required('admin')
 def api_db_backup():
