@@ -1187,6 +1187,8 @@ table.tbl tbody tr:hover { background: var(--acc-soft) }
     <div id="securityCheckBox" class="muted" style="margin-bottom:10px">Validando seguridad de nube...</div>
     <div class="toolbar" style="margin-bottom:10px">
       <button class="btn btn-o btn-sm" onclick="loadSecurityEvents()">Recargar</button>
+      <button class="btn btn-o btn-sm" onclick="runBackupVerify()">Verificar backup</button>
+      <button class="btn btn-o btn-sm" onclick="runAutoBackupNow()">Forzar auto backup</button>
       <span id="securityCounts" class="audit-pill">Cargando...</span>
     </div>
     <div id="securityEventsBox"><div class="muted">Abre esta seccion para ver la auditoria.</div></div>
@@ -2748,6 +2750,11 @@ function auditContextLines(ev){
   pick('restored_from', 'restaurado desde');
   pick('requested_path', 'ruta');
   pick('size', 'tamano');
+  pick('integrity', 'integridad');
+  pick('source_integrity', 'integridad origen');
+  pick('restored_integrity', 'integridad restaurada');
+  pick('removed_old', 'backups eliminados');
+  pick('action_name', 'accion');
   pick('error', 'error');
   pick('must_change_password', 'cambio obligatorio');
   return lines.slice(0,5).map(esc).join('<br>') || '-';
@@ -2779,6 +2786,34 @@ function renderSecurityCheck(data){
     </div>
     <div class="sec-check-grid">${rows || '<div class="muted">Sin checks.</div>'}</div>
   `;
+}
+
+async function runBackupVerify(){
+  const role = String(ME?.role||'').toLowerCase();
+  if(role !== 'admin'){ toast('Solo admin'); return; }
+  const r = await api('/api/admin/backup_verify');
+  if(!r || r.ok===false){
+    toast('Error verificando backup');
+    return;
+  }
+  const v = r.verify || {};
+  const age = Number(r.age_seconds||0);
+  const ageTxt = age > 0 ? `${Math.round(age/60)} min` : '0 min';
+  toast(v.ok ? `Backup OK (${ageTxt})` : `Backup con alerta (${ageTxt})`);
+  await loadSecurityEvents();
+}
+
+async function runAutoBackupNow(){
+  const role = String(ME?.role||'').toLowerCase();
+  if(role !== 'admin'){ toast('Solo admin'); return; }
+  const r = await api('/api/admin/auto_backup_now', {method:'POST', body:{}});
+  if(!r || r.ok===false){
+    toast('No se pudo ejecutar auto backup');
+    return;
+  }
+  const b = r.result?.backup?.name || '';
+  toast(b ? `Backup creado: ${b}` : 'Auto backup ejecutado');
+  await loadSecurityEvents();
 }
 
 async function loadSecurityEvents(){

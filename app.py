@@ -3,7 +3,7 @@ Flask + SQLite3 | Sin dependencias de nube | Funciona en local o servidor
 v3: Fix Excel, Selector categorÃ­as, Merge duplicados, Logo+Watermark PDF,
     Dashboard APROBADA, CatÃ¡logo Pro, Comandos seguros
 """
-import sqlite3, os, json, datetime, re, uuid, traceback, secrets, time, ipaddress, socket, unicodedata, shutil
+import sqlite3, os, json, datetime, re, uuid, traceback, secrets, time, ipaddress, socket, unicodedata, shutil, threading
 from functools import wraps
 from flask import (Flask, request, jsonify, g, send_file, session,
                    render_template_string, send_from_directory, abort)
@@ -36,7 +36,7 @@ _DEFAULT_BOT_KEY = 'test-key-local-123'
 
 app = Flask(__name__)
 # Soporte de proxy (Render/NGINX): respeta X-Forwarded-Proto/Host
-app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 app.secret_key = os.environ.get('SECRET_KEY', _DEFAULT_SECRET_KEY)
 
 # â”€â”€â”€ Seguridad base â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -69,6 +69,59 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(BACKUP_DIR, exist_ok=True)
 AUDIT_LOG_PATH = os.environ.get('AUDIT_LOG_PATH') or os.path.join(DATA_DIR, 'security_audit.jsonl')
 os.makedirs(os.path.dirname(AUDIT_LOG_PATH) or DATA_DIR, exist_ok=True)
+
+def _env_flag(name: str, default=False) -> bool:
+    raw = os.environ.get(name)
+    if raw is None:
+        return bool(default)
+    return str(raw).strip().lower() in ('1', 'true', 'yes', 'on', 'si', 'sí')
+
+def _env_int(name: str, default: int, min_v=None, max_v=None) -> int:
+    try:
+        value = int(str(os.environ.get(name, default)).strip())
+    except Exception:
+        value = int(default)
+    if min_v is not None:
+        value = max(int(min_v), value)
+    if max_v is not None:
+        value = min(int(max_v), value)
+    return value
+
+def _configured_ip_networks(env_name: str):
+    raw = (os.environ.get(env_name) or '').strip()
+    if not raw:
+        return []
+    out = []
+    for piece in raw.split(','):
+        token = piece.strip()
+        if not token:
+            continue
+        try:
+            if '/' in token:
+                out.append(ipaddress.ip_network(token, strict=False))
+            else:
+                ip_obj = ipaddress.ip_address(token)
+                prefix = 32 if ip_obj.version == 4 else 128
+                out.append(ipaddress.ip_network(f'{token}/{prefix}', strict=False))
+        except Exception:
+            print(f"[SECURITY] WARNING: IP/CIDR invalido en {env_name}: {token}")
+    return out
+
+ADMIN_IP_ALLOWLIST = _configured_ip_networks('ADMIN_IP_ALLOWLIST')
+BOT_IP_ALLOWLIST = _configured_ip_networks('BOT_IP_ALLOWLIST')
+ADMIN_REAUTH_SECONDS = _env_int('ADMIN_REAUTH_SECONDS', 900 if IS_PROD else 0, min_v=0, max_v=86400)
+AUTO_BACKUP_ENABLED = _env_flag('AUTO_BACKUP_ENABLED', IS_PROD)
+AUTO_BACKUP_EVERY_MIN = _env_int('AUTO_BACKUP_EVERY_MIN', 360, min_v=15, max_v=10080)
+AUTO_BACKUP_KEEP = _env_int('AUTO_BACKUP_KEEP', 40 if IS_PROD else 12, min_v=3, max_v=500)
+SECURITY_BACKUP_MAX_AGE_HOURS = _env_int('SECURITY_BACKUP_MAX_AGE_HOURS', 24 if IS_PROD else 168, min_v=1, max_v=720)
+SECURITY_ALERT_WEBHOOK = (os.environ.get('SECURITY_ALERT_WEBHOOK') or '').strip()
+BACKUP_WEBHOOK_URL = (os.environ.get('BACKUP_WEBHOOK_URL') or '').strip()
+
+_AUTO_BACKUP_LOCK_PATH = os.path.join(BACKUP_DIR, '.auto_backup.lock')
+_AUTO_BACKUP_THREAD = None
+_AUTO_BACKUP_THREAD_LOCK = threading.Lock()
+_ALERT_LOCK = threading.Lock()
+_ALERT_LAST_SENT = {}
 
 def _maybe_migrate_legacy_db():
     """Si cambió DB_PATH a ruta persistente, copia la BD legacy una sola vez."""
@@ -106,6 +159,203 @@ def _db_counts_from_file(path: str):
         return int(c), int(i)
     finally:
         conn.close()
+
+def _client_ip() -> str:
+    try:
+        route = list(request.access_route or [])
+        if route:
+            return str(route[0]).strip()
+    except Exception:
+        pass
+    try:
+        return str(request.remote_addr or '').strip()
+    except Exception:
+        return ''
+
+def _ip_allowed(ip_text: str, networks) -> bool:
+    if not networks:
+        return True
+    try:
+        ip_obj = ipaddress.ip_address((ip_text or '').strip())
+    except Exception:
+        return False
+    for net in networks:
+        try:
+            if ip_obj in net:
+                return True
+        except Exception:
+            continue
+    return False
+
+def _list_backups(limit=0):
+    if not os.path.isdir(BACKUP_DIR):
+        return []
+    rows = []
+    for fn in os.listdir(BACKUP_DIR):
+        fp = os.path.join(BACKUP_DIR, fn)
+        if not (os.path.isfile(fp) and fn.lower().endswith('.db')):
+            continue
+        rows.append({
+            'path': os.path.abspath(fp),
+            'name': fn,
+            'size': int(os.path.getsize(fp)),
+            'mtime': int(os.path.getmtime(fp)),
+        })
+    rows.sort(key=lambda x: x['mtime'], reverse=True)
+    if limit and limit > 0:
+        return rows[:limit]
+    return rows
+
+def _latest_backup_info():
+    rows = _list_backups(limit=1)
+    return rows[0] if rows else None
+
+def _verify_sqlite_file(path: str):
+    result = {'ok': False, 'integrity': '', 'cotizaciones': 0, 'items': 0}
+    if not path or not os.path.isfile(path):
+        result['integrity'] = 'missing'
+        return result
+    conn = sqlite3.connect(path)
+    try:
+        row = conn.execute('PRAGMA integrity_check').fetchone()
+        msg = str((row or [''])[0] or '').strip().lower()
+        result['integrity'] = msg or 'empty'
+        result['ok'] = (msg == 'ok')
+    except Exception as e:
+        result['integrity'] = f'error:{e}'
+    finally:
+        conn.close()
+    try:
+        c, i = _db_counts_from_file(path)
+        result['cotizaciones'] = int(c)
+        result['items'] = int(i)
+    except Exception:
+        pass
+    return result
+
+def _prune_backup_files(keep_n: int):
+    keep_n = max(1, int(keep_n or 1))
+    rows = _list_backups(limit=0)
+    removed = 0
+    for row in rows[keep_n:]:
+        try:
+            os.remove(row['path'])
+            removed += 1
+        except Exception:
+            continue
+    return removed
+
+def _post_json_webhook_async(url: str, payload: dict, timeout=6):
+    if not url:
+        return
+    body = json.dumps(payload, ensure_ascii=False).encode('utf-8')
+    headers = {'Content-Type': 'application/json; charset=utf-8'}
+    def _worker():
+        req = urllib.request.Request(url, data=body, headers=headers, method='POST')
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                resp.read(64)
+        except Exception:
+            pass
+    threading.Thread(target=_worker, daemon=True).start()
+
+def _acquire_file_lock(lock_path: str, stale_seconds=7200):
+    os.makedirs(os.path.dirname(lock_path) or BACKUP_DIR, exist_ok=True)
+    try:
+        fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        os.write(fd, str(int(time.time())).encode('utf-8'))
+        return fd
+    except FileExistsError:
+        try:
+            age = time.time() - os.path.getmtime(lock_path)
+            if age > stale_seconds:
+                os.remove(lock_path)
+        except Exception:
+            pass
+        return None
+    except Exception:
+        return None
+
+def _release_file_lock(lock_path: str, fd):
+    try:
+        if fd is not None:
+            os.close(fd)
+    except Exception:
+        pass
+    try:
+        if os.path.isfile(lock_path):
+            os.remove(lock_path)
+    except Exception:
+        pass
+
+def _run_auto_backup_once(force=False):
+    if not AUTO_BACKUP_ENABLED:
+        return {'ok': False, 'skipped': 'disabled'}
+
+    lock_fd = _acquire_file_lock(_AUTO_BACKUP_LOCK_PATH, stale_seconds=max(3600, AUTO_BACKUP_EVERY_MIN * 120))
+    if lock_fd is None:
+        return {'ok': True, 'skipped': 'locked'}
+
+    try:
+        latest = _latest_backup_info()
+        if latest and not force:
+            age_s = time.time() - float(latest.get('mtime') or 0)
+            if age_s < (AUTO_BACKUP_EVERY_MIN * 60):
+                return {'ok': True, 'skipped': 'not_due', 'age_seconds': int(age_s)}
+
+        out = snapshot_db('auto')
+        if not out:
+            _audit_event('auto_backup', outcome='error', reason='db_missing')
+            return {'ok': False, 'error': 'db_missing'}
+
+        verify = _verify_sqlite_file(out)
+        removed = _prune_backup_files(AUTO_BACKUP_KEEP)
+        meta = {
+            'path': os.path.abspath(out),
+            'name': os.path.basename(out),
+            'size': int(os.path.getsize(out)) if os.path.isfile(out) else 0,
+            'mtime': int(os.path.getmtime(out)) if os.path.isfile(out) else int(time.time()),
+        }
+        _audit_event(
+            'auto_backup',
+            outcome='ok' if verify.get('ok') else 'error',
+            actor={'type': 'system', 'username': 'scheduler'},
+            backup=meta['name'],
+            size=meta['size'],
+            integrity=verify.get('integrity'),
+            removed_old=removed,
+        )
+        if BACKUP_WEBHOOK_URL:
+            _post_json_webhook_async(BACKUP_WEBHOOK_URL, {
+                'event': 'auto_backup',
+                'ok': bool(verify.get('ok')),
+                'backup': meta,
+                'verify': verify,
+                'removed_old': removed,
+            })
+        return {'ok': True, 'backup': meta, 'verify': verify, 'removed_old': removed}
+    finally:
+        _release_file_lock(_AUTO_BACKUP_LOCK_PATH, lock_fd)
+
+def _auto_backup_worker():
+    while True:
+        try:
+            _run_auto_backup_once(force=False)
+        except Exception:
+            pass
+        time.sleep(60)
+
+def _ensure_auto_backup_thread():
+    global _AUTO_BACKUP_THREAD
+    if not AUTO_BACKUP_ENABLED:
+        return
+    if _AUTO_BACKUP_THREAD and _AUTO_BACKUP_THREAD.is_alive():
+        return
+    with _AUTO_BACKUP_THREAD_LOCK:
+        if _AUTO_BACKUP_THREAD and _AUTO_BACKUP_THREAD.is_alive():
+            return
+        _AUTO_BACKUP_THREAD = threading.Thread(target=_auto_backup_worker, name='auto-backup-worker', daemon=True)
+        _AUTO_BACKUP_THREAD.start()
 # Rate limiting (si flask-limiter estÃ¡ disponible)
 limiter = None
 if Limiter and get_remote_address:
@@ -222,7 +472,42 @@ def verify_password(stored_hash: str, pw: str) -> bool:
 
 
 def current_user():
-    return session.get('user')
+    try:
+        return session.get('user')
+    except Exception:
+        return None
+
+def _current_user_db_row():
+    u = current_user() or {}
+    uid = u.get('id')
+    if not uid:
+        return None
+    return query("SELECT * FROM users WHERE id=?", (uid,), one=True)
+
+def _verify_current_user_password(pw: str) -> bool:
+    row = _current_user_db_row()
+    if not row:
+        return False
+    return verify_password(row.get('password_hash') or '', pw or '')
+
+def _admin_reauth_is_recent(valid_for_seconds=None) -> bool:
+    max_age = ADMIN_REAUTH_SECONDS if valid_for_seconds is None else int(valid_for_seconds)
+    if max_age <= 0:
+        return True
+    try:
+        ts = float(session.get('admin_reauth_at') or 0)
+    except Exception:
+        ts = 0
+    if ts <= 0:
+        return False
+    return (time.time() - ts) <= max_age
+
+def _mark_admin_reauth_ok():
+    try:
+        session['admin_reauth_at'] = float(time.time())
+        session.modified = True
+    except Exception:
+        pass
 
 def login_required(fn):
     @wraps(fn)
@@ -272,6 +557,35 @@ def _audit_sanitize(value, key=''):
         return value[:250] + ('...' if len(value) > 250 else '')
     return str(value)
 
+def _should_send_security_alert(payload: dict) -> bool:
+    action = str(payload.get('action') or '').lower()
+    outcome = str(payload.get('outcome') or '').lower()
+    path = str(payload.get('path') or '').lower()
+    if action in {'admin_ip_blocked', 'bot_ip_blocked', 'bot_key_failed', 'db_restore_reauth_failed'}:
+        return True
+    if action == 'login_failed':
+        return True
+    if action in {'db_restore', 'auto_backup'}:
+        return outcome in {'ok', 'error', 'rejected'}
+    if path.startswith('/api/admin/') and outcome in {'error', 'rejected'}:
+        return True
+    return False
+
+def _maybe_send_security_alert(payload: dict):
+    if not SECURITY_ALERT_WEBHOOK:
+        return
+    if not _should_send_security_alert(payload):
+        return
+    key = f"{payload.get('action')}|{payload.get('outcome')}"
+    now = time.time()
+    with _ALERT_LOCK:
+        last = float(_ALERT_LAST_SENT.get(key) or 0)
+        # Evita spam masivo de alertas iguales.
+        if now - last < 15:
+            return
+        _ALERT_LAST_SENT[key] = now
+    _post_json_webhook_async(SECURITY_ALERT_WEBHOOK, {'event': 'security_alert', 'payload': payload}, timeout=5)
+
 def _audit_event(action, outcome='ok', actor=None, **details):
     try:
         payload = {
@@ -282,7 +596,7 @@ def _audit_event(action, outcome='ok', actor=None, **details):
         try:
             payload['path'] = request.path or ''
             payload['method'] = request.method or ''
-            payload['ip'] = request.remote_addr or ''
+            payload['ip'] = _client_ip()
             ua = request.headers.get('User-Agent') or ''
             if ua:
                 payload['ua'] = _audit_sanitize(ua, 'user_agent')
@@ -308,6 +622,7 @@ def _audit_event(action, outcome='ok', actor=None, **details):
 
         with open(AUDIT_LOG_PATH, 'a', encoding='utf-8') as f:
             f.write(json.dumps(payload, ensure_ascii=False, separators=(',', ':')) + '\n')
+        _maybe_send_security_alert(payload)
     except Exception:
         pass
 
@@ -397,6 +712,7 @@ def ensure_db_ready():
         init_db()
         print(f"[DB] Usando base: {DB_PATH}")
         _DB_INIT_DONE = True
+        _ensure_auto_backup_thread()
     except Exception as e:
         # No tumbar el proceso; las rutas devolverÃ¡n error controlado.
         print("[WARN] No se pudo inicializar la BD:", e)
@@ -428,6 +744,42 @@ def execute(sql, params=()):
     db.commit()
     return cur.lastrowid
 
+def _enforce_ip_allowlist(scope: str, networks, actor=None):
+    if not networks:
+        return None
+    ip = _client_ip()
+    if _ip_allowed(ip, networks):
+        return None
+    _audit_event(f'{scope}_ip_blocked', outcome='rejected', actor=actor, reason='ip_not_allowed', ip=ip)
+    return jsonify({'ok': False, 'error': 'IP no autorizada para esta ruta'}), 403
+
+def _require_admin_reauth_for_action(data, target_action='admin_action'):
+    if ADMIN_REAUTH_SECONDS <= 0:
+        return None
+    if _admin_reauth_is_recent(ADMIN_REAUTH_SECONDS):
+        return None
+    data = data or {}
+    pw = str(data.get('admin_password') or data.get('password') or '').strip()
+    if not pw:
+        _audit_event('db_restore_reauth_failed', outcome='rejected', actor=current_user(), reason='password_required', action_name=target_action)
+        return jsonify({
+            'ok': False,
+            'error': 'Se requiere confirmacion de contrasena admin para esta accion.',
+            'code': 'admin_reauth_required',
+            'valid_for_seconds': ADMIN_REAUTH_SECONDS,
+        }), 401
+    if not _verify_current_user_password(pw):
+        _audit_event('db_restore_reauth_failed', outcome='rejected', actor=current_user(), reason='invalid_password', action_name=target_action)
+        return jsonify({
+            'ok': False,
+            'error': 'Contrasena admin invalida.',
+            'code': 'admin_reauth_invalid',
+            'valid_for_seconds': ADMIN_REAUTH_SECONDS,
+        }), 401
+    _mark_admin_reauth_ok()
+    _audit_event('admin_reauth', actor=current_user(), source='inline', action_name=target_action, valid_for_seconds=ADMIN_REAUTH_SECONDS)
+    return None
+
 
 @app.before_request
 def _enforce_auth_for_api():
@@ -437,6 +789,10 @@ def _enforce_auth_for_api():
     p = request.path or ''
     if not p.startswith('/api/'):
         return
+    if p.startswith('/api/admin/'):
+        ip_err = _enforce_ip_allowlist('admin', ADMIN_IP_ALLOWLIST, actor=current_user() or {'type': 'anonymous'})
+        if ip_err:
+            return ip_err
     if p in PUBLIC_API_WHITELIST:
         return
     # endpoints pÃºblicos por token (si en el futuro se crean en /api/public/...)
@@ -444,6 +800,9 @@ def _enforce_auth_for_api():
         return
     # bot endpoints se autentican con X-Bot-Key, no con sesiÃ³n
     if p.startswith('/api/bot/'):
+        ip_err = _enforce_ip_allowlist('bot', BOT_IP_ALLOWLIST, actor={'type': 'bot'})
+        if ip_err:
+            return ip_err
         return
 
     if not current_user():
@@ -1552,6 +1911,22 @@ def api_change_password():
     _audit_event('password_changed', actor=current_user(), user_id=row['id'])
     return jsonify({'ok': True})
 
+@app.post('/api/admin/reauth')
+@role_required('admin')
+@limit('20 per hour')
+def api_admin_reauth():
+    d = request.json or {}
+    pw = str(d.get('password') or d.get('admin_password') or '').strip()
+    if not pw:
+        _audit_event('admin_reauth_failed', outcome='rejected', actor=current_user(), reason='password_required')
+        return jsonify({'ok': False, 'error': 'Contrasena requerida'}), 400
+    if not _verify_current_user_password(pw):
+        _audit_event('admin_reauth_failed', outcome='rejected', actor=current_user(), reason='invalid_password')
+        return jsonify({'ok': False, 'error': 'Contrasena invalida'}), 401
+    _mark_admin_reauth_ok()
+    _audit_event('admin_reauth', actor=current_user(), source='explicit', valid_for_seconds=ADMIN_REAUTH_SECONDS)
+    return jsonify({'ok': True, 'valid_for_seconds': ADMIN_REAUTH_SECONDS})
+
 
 @app.get('/api/catalogo')
 def get_catalogo():
@@ -2232,15 +2607,9 @@ def api_db_status():
     try:
         cot_count = query("SELECT COUNT(*) as n FROM cotizaciones", one=True)['n']
         item_count = query("SELECT COUNT(*) as n FROM items", one=True)['n']
-        backups = []
-        if os.path.isdir(BACKUP_DIR):
-            files = []
-            for fn in os.listdir(BACKUP_DIR):
-                fp = os.path.join(BACKUP_DIR, fn)
-                if os.path.isfile(fp) and fn.lower().endswith('.db'):
-                    files.append((os.path.getmtime(fp), fn, os.path.getsize(fp)))
-            files.sort(reverse=True)
-            backups = [{'name': fn, 'size': sz, 'mtime': int(mt)} for mt, fn, sz in files[:20]]
+        backups = _list_backups(limit=20)
+        latest = backups[0] if backups else None
+        latest_verify = _verify_sqlite_file(latest['path']) if latest else {'ok': False, 'integrity': 'missing'}
         return jsonify({
             'ok': True,
             'base_dir': BASE_DIR,
@@ -2253,6 +2622,14 @@ def api_db_status():
             'cotizaciones': cot_count,
             'items': item_count,
             'backups': backups,
+            'latest_backup': latest,
+            'latest_backup_verify': latest_verify,
+            'auto_backup': {
+                'enabled': bool(AUTO_BACKUP_ENABLED),
+                'every_min': int(AUTO_BACKUP_EVERY_MIN),
+                'keep': int(AUTO_BACKUP_KEEP),
+                'max_age_hours': int(SECURITY_BACKUP_MAX_AGE_HOURS),
+            },
         })
     except Exception as e:
         return jsonify({'ok': False, 'error': str(e)}), 500
@@ -2268,6 +2645,34 @@ def api_security_check():
         db_path_abs = os.path.abspath(DB_PATH)
         backup_dir_abs = os.path.abspath(BACKUP_DIR)
         audit_path_abs = os.path.abspath(AUDIT_LOG_PATH)
+
+        latest_backup = _latest_backup_info()
+        latest_verify = _verify_sqlite_file(latest_backup['path']) if latest_backup else {'ok': False, 'integrity': 'missing'}
+        latest_age_s = max(0, int(time.time() - int(latest_backup.get('mtime') or 0))) if latest_backup else None
+        max_age_s = int(SECURITY_BACKUP_MAX_AGE_HOURS * 3600)
+        has_security_webhook = bool(SECURITY_ALERT_WEBHOOK)
+        has_backup_webhook = bool(BACKUP_WEBHOOK_URL)
+        auto_thread_ok = bool(_AUTO_BACKUP_THREAD and _AUTO_BACKUP_THREAD.is_alive()) if AUTO_BACKUP_ENABLED else True
+
+        events = _read_audit_tail(300)
+        now_dt = datetime.datetime.utcnow()
+        rejected_24h = 0
+        error_24h = 0
+        for ev in events:
+            try:
+                ts_raw = str(ev.get('ts') or '')
+                if not ts_raw:
+                    continue
+                ts = datetime.datetime.fromisoformat(ts_raw.replace('Z', '+00:00')).replace(tzinfo=None)
+                if (now_dt - ts).total_seconds() > 86400:
+                    continue
+                out = str(ev.get('outcome') or '').lower()
+                if out == 'rejected':
+                    rejected_24h += 1
+                elif out == 'error':
+                    error_24h += 1
+            except Exception:
+                continue
 
         is_persist_path = lambda p: p.startswith('/var/data')
         checks = []
@@ -2385,11 +2790,81 @@ def api_security_check():
             value=bool(limiter is not None),
             recommendation='Instalar flask-limiter en entorno productivo.'
         )
+        add(
+            'admin_ip_allowlist',
+            'Allowlist IP para rutas admin',
+            (len(ADMIN_IP_ALLOWLIST) > 0) if IS_PROD else True,
+            value=len(ADMIN_IP_ALLOWLIST),
+            recommendation='Configurar ADMIN_IP_ALLOWLIST con IP(s)/CIDR de acceso admin.'
+        )
+        add(
+            'bot_ip_allowlist',
+            'Allowlist IP para rutas bot',
+            (len(BOT_IP_ALLOWLIST) > 0) if IS_PROD else True,
+            value=len(BOT_IP_ALLOWLIST),
+            recommendation='Configurar BOT_IP_ALLOWLIST para restringir peticiones del bot.'
+        )
+        add(
+            'admin_reauth_enabled',
+            'Reautenticacion admin para restaurar base',
+            ADMIN_REAUTH_SECONDS > 0,
+            value=ADMIN_REAUTH_SECONDS,
+            recommendation='Definir ADMIN_REAUTH_SECONDS (recomendado 600-1800).'
+        )
+        add(
+            'auto_backup_enabled',
+            'Backup automatico habilitado',
+            bool(AUTO_BACKUP_ENABLED),
+            value={'enabled': bool(AUTO_BACKUP_ENABLED), 'every_min': int(AUTO_BACKUP_EVERY_MIN), 'keep': int(AUTO_BACKUP_KEEP)},
+            recommendation='Activar AUTO_BACKUP_ENABLED y revisar frecuencia.'
+        )
+        add(
+            'auto_backup_worker_running',
+            'Worker de backup automatico activo',
+            bool(auto_thread_ok),
+            value='running' if auto_thread_ok else 'stopped',
+            recommendation='Reiniciar servicio si el worker no aparece activo.'
+        )
+        add(
+            'latest_backup_exists',
+            'Existe al menos un backup',
+            bool(latest_backup),
+            value=(latest_backup or {}).get('name') if latest_backup else 'none',
+            recommendation='Ejecutar backup inicial y validar ruta persistente.'
+        )
+        add(
+            'latest_backup_fresh',
+            f'Backup reciente (<={SECURITY_BACKUP_MAX_AGE_HOURS}h)',
+            bool(latest_backup and latest_age_s is not None and latest_age_s <= max_age_s),
+            value={'age_seconds': latest_age_s, 'max_age_seconds': max_age_s},
+            recommendation='Reducir AUTO_BACKUP_EVERY_MIN o generar backup manual ahora.'
+        )
+        add(
+            'latest_backup_integrity',
+            'Ultimo backup pasa integridad sqlite',
+            bool(latest_backup and latest_verify.get('ok')),
+            value=latest_verify.get('integrity'),
+            recommendation='No restaurar backups con integridad fallida.'
+        )
+        add(
+            'security_webhook',
+            'Webhook de alertas de seguridad configurado',
+            has_security_webhook if IS_PROD else True,
+            value='configured' if has_security_webhook else 'not_set',
+            recommendation='Configurar SECURITY_ALERT_WEBHOOK para alertas en tiempo real.'
+        )
+        add(
+            'backup_webhook',
+            'Webhook de backup/restore configurado',
+            has_backup_webhook if IS_PROD else True,
+            value='configured' if has_backup_webhook else 'not_set',
+            recommendation='Configurar BACKUP_WEBHOOK_URL para observabilidad externa.'
+        )
 
         total = len(checks)
         ok_n = len([c for c in checks if c['ok']])
         fail_n = total - ok_n
-        level = 'ok' if fail_n == 0 else ('warn' if fail_n <= 3 else 'error')
+        level = 'ok' if fail_n == 0 else ('warn' if fail_n <= 4 else 'error')
         return jsonify({
             'ok': True,
             'generated_at': now_utc,
@@ -2407,6 +2882,22 @@ def api_security_check():
                 'backup_dir': backup_dir_abs,
                 'audit_log_path': audit_path_abs,
                 'max_upload_bytes': int(app.config.get('MAX_CONTENT_LENGTH') or 0),
+                'admin_ip_allowlist': len(ADMIN_IP_ALLOWLIST),
+                'bot_ip_allowlist': len(BOT_IP_ALLOWLIST),
+                'admin_reauth_seconds': int(ADMIN_REAUTH_SECONDS),
+                'auto_backup_enabled': bool(AUTO_BACKUP_ENABLED),
+                'auto_backup_every_min': int(AUTO_BACKUP_EVERY_MIN),
+                'auto_backup_keep': int(AUTO_BACKUP_KEEP),
+                'security_backup_max_age_hours': int(SECURITY_BACKUP_MAX_AGE_HOURS),
+                'security_alert_webhook': has_security_webhook,
+                'backup_webhook': has_backup_webhook,
+                'latest_backup': latest_backup,
+                'latest_backup_verify': latest_verify,
+                'latest_backup_age_seconds': latest_age_s,
+                'audit_events_last_24h': {
+                    'rejected': int(rejected_24h),
+                    'error': int(error_24h),
+                },
             },
             'checks': checks,
         })
@@ -2421,10 +2912,51 @@ def api_db_backup():
         if not out:
             _audit_event('db_backup', outcome='rejected', reason='no_database_available')
             return jsonify({'ok': False, 'error': 'No existe base para respaldar'}), 404
-        _audit_event('db_backup', backup=os.path.basename(out), backup_path=out, size=os.path.getsize(out))
-        return jsonify({'ok': True, 'backup': os.path.basename(out), 'path': out})
+        verify = _verify_sqlite_file(out)
+        removed = _prune_backup_files(AUTO_BACKUP_KEEP)
+        size = os.path.getsize(out) if os.path.isfile(out) else 0
+        _audit_event(
+            'db_backup',
+            outcome='ok' if verify.get('ok') else 'error',
+            actor=current_user(),
+            backup=os.path.basename(out),
+            backup_path=out,
+            size=size,
+            integrity=verify.get('integrity'),
+            removed_old=removed,
+        )
+        if BACKUP_WEBHOOK_URL:
+            _post_json_webhook_async(BACKUP_WEBHOOK_URL, {
+                'event': 'manual_backup',
+                'ok': bool(verify.get('ok')),
+                'backup': {'name': os.path.basename(out), 'path': out, 'size': size},
+                'verify': verify,
+                'removed_old': removed,
+                'actor': (current_user() or {}).get('username') or '',
+            })
+        return jsonify({
+            'ok': True,
+            'backup': os.path.basename(out),
+            'path': out,
+            'size': size,
+            'verify': verify,
+            'removed_old': removed,
+        })
     except Exception as e:
         _audit_event('db_backup', outcome='error', error=str(e))
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+@app.post('/api/admin/auto_backup_now')
+@role_required('admin')
+def api_auto_backup_now():
+    try:
+        result = _run_auto_backup_once(force=True)
+        if not result.get('ok'):
+            return jsonify({'ok': False, 'error': result.get('error') or result.get('skipped') or 'backup_failed', 'result': result}), 500
+        _audit_event('auto_backup_manual_trigger', actor=current_user(), result=result)
+        return jsonify({'ok': True, 'result': result})
+    except Exception as e:
+        _audit_event('auto_backup_manual_trigger', outcome='error', actor=current_user(), error=str(e))
         return jsonify({'ok': False, 'error': str(e)}), 500
 
 @app.get('/api/admin/db_scan')
@@ -2464,11 +2996,44 @@ def api_db_scan():
     except Exception as e:
         return jsonify({'ok': False, 'error': str(e)}), 500
 
+@app.get('/api/admin/backup_verify')
+@role_required('admin')
+def api_backup_verify():
+    try:
+        latest = _latest_backup_info()
+        if not latest:
+            _audit_event('backup_verify', outcome='rejected', actor=current_user(), reason='no_backups')
+            return jsonify({'ok': False, 'error': 'No hay backups disponibles'}), 404
+        verify = _verify_sqlite_file(latest['path'])
+        age_seconds = max(0, int(time.time() - int(latest.get('mtime') or 0)))
+        _audit_event(
+            'backup_verify',
+            outcome='ok' if verify.get('ok') else 'error',
+            actor=current_user(),
+            backup=latest.get('name'),
+            integrity=verify.get('integrity'),
+            age_seconds=age_seconds,
+        )
+        return jsonify({
+            'ok': True,
+            'backup': latest,
+            'verify': verify,
+            'age_seconds': age_seconds,
+            'max_age_seconds': int(SECURITY_BACKUP_MAX_AGE_HOURS * 3600),
+            'fresh': age_seconds <= int(SECURITY_BACKUP_MAX_AGE_HOURS * 3600),
+        })
+    except Exception as e:
+        _audit_event('backup_verify', outcome='error', actor=current_user(), error=str(e))
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
 @app.post('/api/admin/db_restore')
 @role_required('admin')
 def api_db_restore():
     try:
         data = request.json or {}
+        reauth_err = _require_admin_reauth_for_action(data, target_action='db_restore')
+        if reauth_err:
+            return reauth_err
         src = os.path.abspath(str(data.get('path') or '').strip())
         if not src or not os.path.isfile(src):
             _audit_event('db_restore', outcome='rejected', reason='source_missing', requested_path=src)
@@ -2478,17 +3043,34 @@ def api_db_restore():
         if not any(src.startswith(root + os.sep) or src == root for root in allowed_roots):
             _audit_event('db_restore', outcome='rejected', reason='forbidden_source', requested_path=src)
             return jsonify({'ok': False, 'error': 'Ruta origen no permitida'}), 403
+        source_verify = _verify_sqlite_file(src)
+        if not source_verify.get('ok'):
+            _audit_event('db_restore', outcome='rejected', reason='source_integrity_failed', requested_path=src, integrity=source_verify.get('integrity'))
+            return jsonify({'ok': False, 'error': 'Backup origen no paso integridad sqlite', 'verify': source_verify}), 400
         cot_count, item_count = _db_counts_from_file(src)
         backup_prev = snapshot_db('pre_restore')
         os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
         shutil.copy2(src, DB_PATH)
+        restored_verify = _verify_sqlite_file(DB_PATH)
         _audit_event(
             'db_restore',
+            outcome='ok' if restored_verify.get('ok') else 'error',
             restored_from=src,
             backup_previous=backup_prev,
             cotizaciones=cot_count,
             items=item_count,
+            source_integrity=source_verify.get('integrity'),
+            restored_integrity=restored_verify.get('integrity'),
         )
+        if BACKUP_WEBHOOK_URL:
+            _post_json_webhook_async(BACKUP_WEBHOOK_URL, {
+                'event': 'db_restore',
+                'ok': bool(restored_verify.get('ok')),
+                'source': src,
+                'backup_previous': backup_prev,
+                'verify': restored_verify,
+                'actor': (current_user() or {}).get('username') or '',
+            })
         return jsonify({
             'ok': True,
             'restored_from': src,
@@ -2496,6 +3078,7 @@ def api_db_restore():
             'cotizaciones': cot_count,
             'items': item_count,
             'db_path': DB_PATH,
+            'verify': restored_verify,
         })
     except Exception as e:
         _audit_event('db_restore', outcome='error', error=str(e))
@@ -3861,9 +4444,11 @@ def print_inventario():
 
 def _require_bot_key():
     if not BOT_KEYS:
+        _audit_event('bot_key_failed', outcome='rejected', actor={'type': 'bot'}, reason='bot_key_not_configured')
         return jsonify({'ok': False, 'error': 'BOT_KEY no configurado en el servidor.'}), 503
     k = request.headers.get('X-Bot-Key') or request.headers.get('x-bot-key') or ''
     if not k or k not in BOT_KEYS:
+        _audit_event('bot_key_failed', outcome='rejected', actor={'type': 'bot'}, reason='invalid_bot_key')
         return jsonify({'ok': False, 'error': 'Unauthorized'}), 401
     return None
 
@@ -4621,6 +5206,7 @@ def bot_transcribir_audio():
 
 if __name__ == '__main__':
     init_db()
+    _ensure_auto_backup_thread()
     print("\n" + "="*50)
     print("  ðŸš€ RC DOMOTIC Cotizador v3.0")
     print("  http://localhost:5000")
