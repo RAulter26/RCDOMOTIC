@@ -3213,6 +3213,65 @@ def api_db_backup_download():
         _audit_event('db_backup_download', outcome='error', actor=current_user(), error=str(e))
         return jsonify({'ok': False, 'error': str(e)}), 500
 
+@app.post('/api/admin/db_restore_upload')
+@role_required('admin')
+def api_db_restore_upload():
+    """Sube un backup sqlite para poder restaurarlo desde la nube de forma segura."""
+    upload_path = ''
+    try:
+        f = (request.files or {}).get('file')
+        if not f or not getattr(f, 'filename', ''):
+            _audit_event('db_restore_upload', outcome='rejected', actor=current_user(), reason='missing_file')
+            return jsonify({'ok': False, 'error': 'Archivo requerido'}), 400
+
+        original_name = secure_filename(f.filename or '')
+        ext = (os.path.splitext(original_name)[1] or '').lower()
+        if ext not in ('.db', '.sqlite', '.sqlite3'):
+            _audit_event('db_restore_upload', outcome='rejected', actor=current_user(), reason='invalid_extension', filename=original_name)
+            return jsonify({'ok': False, 'error': 'Formato no permitido. Usa .db/.sqlite/.sqlite3'}), 400
+
+        ts = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+        stored_name = f"restore_upload_{ts}_{uuid.uuid4().hex[:8]}.db"
+        upload_path = os.path.join(BACKUP_DIR, stored_name)
+        f.save(upload_path)
+        if not os.path.isfile(upload_path) or os.path.getsize(upload_path) <= 0:
+            _audit_event('db_restore_upload', outcome='rejected', actor=current_user(), reason='empty_upload', filename=original_name)
+            return jsonify({'ok': False, 'error': 'El archivo subido está vacío'}), 400
+
+        verify = _verify_sqlite_file(upload_path)
+        if not verify.get('ok'):
+            try:
+                os.remove(upload_path)
+            except Exception:
+                pass
+            _audit_event('db_restore_upload', outcome='rejected', actor=current_user(), reason='integrity_failed', filename=original_name, integrity=verify.get('integrity'))
+            return jsonify({'ok': False, 'error': 'Backup inválido (integridad SQLite falló)', 'verify': verify}), 400
+
+        size = os.path.getsize(upload_path)
+        _audit_event(
+            'db_restore_upload',
+            actor=current_user(),
+            filename=original_name,
+            stored_as=stored_name,
+            size=size,
+            integrity=verify.get('integrity'),
+        )
+        return jsonify({
+            'ok': True,
+            'name': stored_name,
+            'path': os.path.abspath(upload_path),
+            'size': size,
+            'verify': verify,
+        })
+    except Exception as e:
+        if upload_path and os.path.isfile(upload_path):
+            try:
+                os.remove(upload_path)
+            except Exception:
+                pass
+        _audit_event('db_restore_upload', outcome='error', actor=current_user(), error=str(e))
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
 @app.post('/api/admin/auto_backup_now')
 @role_required('admin')
 def api_auto_backup_now():

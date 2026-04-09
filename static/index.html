@@ -1190,6 +1190,7 @@ table.tbl tbody tr:hover { background: var(--acc-soft) }
       <button class="btn btn-o btn-sm" onclick="loadSecurityEvents()">Recargar</button>
       <button class="btn btn-o btn-sm" onclick="runQuickHarden()">Blindaje rapido</button>
       <button class="btn btn-o btn-sm" onclick="downloadBackupFile()">Descargar backup</button>
+      <button class="btn btn-o btn-sm" onclick="uploadAndRestoreBackup()">Subir y restaurar</button>
       <button class="btn btn-o btn-sm" onclick="runBackupVerify()">Verificar backup</button>
       <button class="btn btn-o btn-sm" onclick="runAutoBackupNow()">Forzar auto backup</button>
       <span id="securityCounts" class="audit-pill">Cargando...</span>
@@ -2832,6 +2833,46 @@ function downloadBackupFile(){
   const role = String(ME?.role||'').toLowerCase();
   if(role !== 'admin'){ toast('Solo admin'); return; }
   window.open('/api/admin/db_backup_download', '_blank');
+}
+
+function uploadAndRestoreBackup(){
+  const role = String(ME?.role||'').toLowerCase();
+  if(role !== 'admin'){ toast('Solo admin'); return; }
+
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.db,.sqlite,.sqlite3';
+  input.onchange = async () => {
+    const f = input.files && input.files[0];
+    if(!f) return;
+    toast('Subiendo backup...');
+    const fd = new FormData();
+    fd.append('file', f);
+    const up = await api('/api/admin/db_restore_upload', { method:'POST', body: fd });
+    if(!up || up.ok===false){
+      toast('No se pudo subir backup');
+      return;
+    }
+
+    let pw = '';
+    let rs = await api('/api/admin/db_restore', { method:'POST', body:{ path: up.path } });
+    if(rs && rs.ok===false && (rs.code==='admin_reauth_required' || rs.code==='admin_reauth_invalid' || rs.status===401)){
+      pw = prompt('Confirma contrasena admin para restaurar:', '') || '';
+      if(!pw){
+        toast('Restauracion cancelada');
+        return;
+      }
+      rs = await api('/api/admin/db_restore', { method:'POST', body:{ path: up.path, admin_password: pw } });
+    }
+
+    if(!rs || rs.ok===false){
+      toast('No se pudo restaurar backup');
+      return;
+    }
+    toast('Backup restaurado correctamente');
+    await loadSecurityEvents();
+  };
+  input.click();
 }
 
 async function runAutoBackupNow(){
