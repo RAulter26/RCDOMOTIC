@@ -62,6 +62,7 @@ else:
 DB_PATH = os.environ.get('DB_PATH', os.path.join(DATA_DIR, 'rc_domotic.db'))
 UPLOADS_DIR = os.environ.get('UPLOADS_DIR', os.path.join(DATA_DIR, 'uploads'))
 UPLOAD_FOLDER = os.path.join(UPLOADS_DIR, 'products')
+FALLBACK_UPLOAD_FOLDER = os.path.join(BASE_DIR, 'uploads', 'products')
 BACKUP_DIR = os.environ.get('BACKUP_DIR', os.path.join(DATA_DIR, 'backups'))
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp'}
 
@@ -826,6 +827,49 @@ def _repair_mojibake_obj(value):
         return {k: _repair_mojibake_obj(v) for k, v in value.items()}
     return value
 
+def _upload_folders():
+    seen = set()
+    for folder in (UPLOAD_FOLDER, FALLBACK_UPLOAD_FOLDER):
+        f = os.path.abspath(folder)
+        if f in seen:
+            continue
+        seen.add(f)
+        if os.path.isdir(f):
+            yield f
+
+def _resolve_upload_filepath(filename: str):
+    if not filename:
+        return None
+    safe = os.path.basename(str(filename))
+    if not safe:
+        return None
+    for folder in _upload_folders():
+        fp = os.path.join(folder, safe)
+        if os.path.isfile(fp):
+            return fp
+    return None
+
+def _resolve_upload_from_url(url: str):
+    raw = str(url or '').strip()
+    if not raw.startswith('/uploads/products/'):
+        return None
+    fn = raw.split('/uploads/products/', 1)[1]
+    return _resolve_upload_filepath(fn)
+
+def _delete_primary_upload_from_url(url: str):
+    raw = str(url or '').strip()
+    if not raw.startswith('/uploads/products/'):
+        return
+    fn = os.path.basename(raw.split('/uploads/products/', 1)[1])
+    if not fn:
+        return
+    target = os.path.join(os.path.abspath(UPLOAD_FOLDER), fn)
+    if os.path.isfile(target):
+        try:
+            os.remove(target)
+        except Exception:
+            pass
+
 # â”€â”€â”€ Imagen utils (fondo transparente simple: blanco -> alpha) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 def _remove_white_bg_to_png(src_path: str, dst_path: str, thr: int = 245):
     """Convierte fondo blanco/casi blanco a transparente.
@@ -897,6 +941,12 @@ def _enforce_ip_allowlist(scope: str, networks, actor=None):
     _audit_event(f'{scope}_ip_blocked', outcome='rejected', actor=actor, reason='ip_not_allowed', ip=ip)
     return jsonify({'ok': False, 'error': 'IP no autorizada para esta ruta'}), 403
 
+def _bot_key_from_headers() -> str:
+    return (request.headers.get('X-Bot-Key') or request.headers.get('x-bot-key') or '').strip()
+
+def _request_has_valid_bot_key() -> bool:
+    return bool(BOT_KEYS) and (_bot_key_from_headers() in BOT_KEYS)
+
 def _require_admin_reauth_for_action(data, target_action='admin_action'):
     sec = _runtime_security_settings()
     reauth_seconds = int(sec.get('admin_reauth_seconds') or 0)
@@ -947,9 +997,16 @@ def _enforce_auth_for_api():
         return
     # bot endpoints se autentican con X-Bot-Key, no con sesiÃ³n
     if p.startswith('/api/bot/'):
-        ip_err = _enforce_ip_allowlist('bot', sec.get('bot_ip_allowlist') or [], actor={'type': 'bot'})
-        if ip_err:
-            return ip_err
+        bot_networks = sec.get('bot_ip_allowlist') or []
+        has_valid_bot_key = _request_has_valid_bot_key()
+        if bot_networks and not has_valid_bot_key:
+            ip_err = _enforce_ip_allowlist('bot', bot_networks, actor={'type': 'bot'})
+            if ip_err:
+                return ip_err
+        elif bot_networks and has_valid_bot_key:
+            ip = _client_ip()
+            if not _ip_allowed(ip, bot_networks):
+                _audit_event('bot_ip_bypass_key', actor={'type': 'bot'}, reason='valid_bot_key', ip=ip)
         return
 
     if not current_user():
@@ -1727,7 +1784,8 @@ def _sync_catalog_images_from_uploads(conn):
     Preferencia: amazon > local > catalogo > otros.
     """
     try:
-        if not os.path.isdir(UPLOAD_FOLDER):
+        folders = list(_upload_folders())
+        if not folders:
             return 0
         mapping = {}
 
@@ -1741,23 +1799,24 @@ def _sync_catalog_images_from_uploads(conn):
                 return 1
             return 0
 
-        for fn in sorted(os.listdir(UPLOAD_FOLDER)):
-            fpath = os.path.join(UPLOAD_FOLDER, fn)
-            if not os.path.isfile(fpath):
-                continue
-            low = fn.lower()
-            if not low.endswith(('.png', '.jpg', '.jpeg', '.webp', '.gif', '.bmp', '.svg')):
-                continue
-            m = re.match(r'^([A-Za-z]{2,5}-\d{3})_', fn)
-            if not m:
-                continue
-            pid = m.group(1).upper()
-            if pid not in mapping:
-                mapping[pid] = fn
-            else:
-                cur = mapping[pid]
-                if _img_priority(fn) > _img_priority(cur):
-                    mapping[pid] = fn
+        primary_abs = os.path.abspath(UPLOAD_FOLDER)
+        for folder in folders:
+            is_primary = os.path.abspath(folder) == primary_abs
+            for fn in sorted(os.listdir(folder)):
+                fpath = os.path.join(folder, fn)
+                if not os.path.isfile(fpath):
+                    continue
+                low = fn.lower()
+                if not low.endswith(('.png', '.jpg', '.jpeg', '.webp', '.gif', '.bmp', '.svg')):
+                    continue
+                m = re.match(r'^([A-Za-z]{2,5}-\d{3})_', fn)
+                if not m:
+                    continue
+                pid = m.group(1).upper()
+                score = (_img_priority(fn), 1 if is_primary else 0)
+                current = mapping.get(pid)
+                if (not current) or (score > current[0]):
+                    mapping[pid] = (score, fn)
         if not mapping:
             return 0
 
@@ -1766,17 +1825,18 @@ def _sync_catalog_images_from_uploads(conn):
         for row in rows:
             pid = str(row[0] or '').upper()
             cur = str(row[1] or '').strip()
-            fallback_fn = mapping.get(pid)
-            if not fallback_fn:
+            fallback_data = mapping.get(pid)
+            if not fallback_data:
                 continue
+            fallback_fn = fallback_data[1]
             fallback_url = f"/uploads/products/{fallback_fn}"
             must_update = False
             if (not cur) or (cur.upper() == 'SIN_IMG'):
                 must_update = True
             elif cur.startswith('/uploads/products/'):
                 cur_fn = cur.split('/uploads/products/', 1)[1]
-                cur_path = os.path.join(UPLOAD_FOLDER, cur_fn)
-                if not os.path.isfile(cur_path):
+                cur_path = _resolve_upload_filepath(cur_fn)
+                if not cur_path:
                     must_update = True
                 else:
                     if _img_priority(fallback_fn) > _img_priority(cur_fn):
@@ -1823,7 +1883,10 @@ def _sync_amazon_catalog_images(conn):
 
 @app.route('/uploads/products/<path:filename>')
 def serve_upload(filename):
-    return send_from_directory(UPLOAD_FOLDER, filename)
+    fp = _resolve_upload_filepath(filename)
+    if not fp:
+        abort(404)
+    return send_from_directory(os.path.dirname(fp), os.path.basename(fp))
 
 @app.post('/api/catalogo/sync_images')
 @role_required('admin')
@@ -1848,8 +1911,7 @@ def upload_product_image(id_producto):
     path = os.path.join(UPLOAD_FOLDER, fname)
     old = query("SELECT imagen_url FROM catalogo WHERE id_producto=?", (id_producto,), one=True)
     if old and old['imagen_url']:
-        op = os.path.join(BASE_DIR, old['imagen_url'].lstrip('/'))
-        if os.path.isfile(op): os.remove(op)
+        _delete_primary_upload_from_url(old['imagen_url'])
     f.save(path)
 
     # opcional: quitar fondo (fotos con fondo blanco)
@@ -1947,10 +2009,7 @@ def import_product_image_from_url(id_producto):
 
     old = query("SELECT imagen_url FROM catalogo WHERE id_producto=?", (id_producto,), one=True)
     if old and old.get('imagen_url'):
-        op = os.path.join(BASE_DIR, old['imagen_url'].lstrip('/'))
-        if os.path.isfile(op):
-            try: os.remove(op)
-            except Exception: pass
+        _delete_primary_upload_from_url(old['imagen_url'])
 
     url_local = f"/uploads/products/{final_name}"
     execute("UPDATE catalogo SET imagen_url=? WHERE id_producto=?", (url_local, id_producto))
@@ -1964,8 +2023,8 @@ def remove_bg_existing(id_producto):
     row = query("SELECT imagen_url FROM catalogo WHERE id_producto=?", (id_producto,), one=True)
     if not row or not row.get('imagen_url'):
         return jsonify({'ok': False, 'error': 'Producto sin imagen'}), 400
-    src = os.path.join(BASE_DIR, row['imagen_url'].lstrip('/'))
-    if not os.path.isfile(src):
+    src = _resolve_upload_from_url(row.get('imagen_url'))
+    if not src or not os.path.isfile(src):
         return jsonify({'ok': False, 'error': 'Imagen no encontrada en servidor'}), 404
     png_name = f"{id_producto}_{uuid.uuid4().hex[:8]}_cut.png"
     png_path = os.path.join(UPLOAD_FOLDER, png_name)
@@ -1979,8 +2038,7 @@ def remove_bg_existing(id_producto):
 def delete_product_image(id_producto):
     old = query("SELECT imagen_url FROM catalogo WHERE id_producto=?", (id_producto,), one=True)
     if old and old['imagen_url']:
-        op = os.path.join(BASE_DIR, old['imagen_url'].lstrip('/'))
-        if os.path.isfile(op): os.remove(op)
+        _delete_primary_upload_from_url(old['imagen_url'])
     execute("UPDATE catalogo SET imagen_url='' WHERE id_producto=?", (id_producto,))
     return jsonify({'ok': True})
 
@@ -4793,8 +4851,7 @@ def _require_bot_key():
     if not BOT_KEYS:
         _audit_event('bot_key_failed', outcome='rejected', actor={'type': 'bot'}, reason='bot_key_not_configured')
         return jsonify({'ok': False, 'error': 'BOT_KEY no configurado en el servidor.'}), 503
-    k = request.headers.get('X-Bot-Key') or request.headers.get('x-bot-key') or ''
-    if not k or k not in BOT_KEYS:
+    if not _request_has_valid_bot_key():
         _audit_event('bot_key_failed', outcome='rejected', actor={'type': 'bot'}, reason='invalid_bot_key')
         return jsonify({'ok': False, 'error': 'Unauthorized'}), 401
     return None
