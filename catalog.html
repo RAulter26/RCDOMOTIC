@@ -371,26 +371,28 @@ input { font-family: inherit; }
 .card-name { font-size: 14px; font-weight: 500; letter-spacing: -0.005em; line-height: 1.3; }
 .card-tag { color: var(--fg-2); font-size: 12px; margin-top: 2px; line-height: 1.4; text-wrap: pretty; }
 .card-foot {
+  margin-top: auto; border-top: 1px solid var(--line-soft);
+}
+.card-price-row {
   display: flex; justify-content: space-between; align-items: center;
-  margin-top: 12px; padding: 10px 14px;
-  background: color-mix(in oklab, var(--bg-0) 60%, transparent);
-  border-top: 1px solid var(--line-soft);
+  padding: 10px 14px 8px;
 }
 .card-price { font-size: 14px; font-weight: 500; letter-spacing: 0; }
 .card-price.muted { color: var(--fg-3); font-size: 12px; letter-spacing: 0.02em; }
 .quote-btn {
-  width: 36px; height: 36px; border-radius: 10px;
-  background: var(--bg-0); color: var(--fg);
-  display: grid; place-items: center;
-  border: 1.5px solid var(--line-soft);
-  transition: all .18s ease; flex-shrink: 0;
+  width: 100%; padding: 9px 0; border-radius: 0 0 var(--radius) var(--radius);
+  background: color-mix(in oklab, var(--accent) 10%, transparent);
+  color: var(--accent); font-size: 13px; font-weight: 600;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  border: none; border-top: 1px solid color-mix(in oklab, var(--accent) 25%, transparent);
+  transition: all .18s ease; cursor: pointer; letter-spacing: 0.02em;
 }
-.quote-btn:hover { background: var(--accent); color: #051a0f; border-color: var(--accent); transform: scale(1.08); }
+.quote-btn:hover { background: var(--accent); color: #051a0f; }
 .quote-btn.on {
-  background: var(--accent); color: #051a0f; border-color: var(--accent);
-  box-shadow: 0 0 14px var(--accent-glow);
+  background: var(--accent); color: #051a0f;
+  box-shadow: 0 0 16px var(--accent-glow);
 }
-.quote-btn.on:hover { background: var(--accent-2); filter: brightness(1.1); }
+.quote-btn.on:hover { background: var(--accent-2); }
 
 /* LIST variant */
 .card.list {
@@ -1031,13 +1033,16 @@ const ProductCard = ({ product, density, showPrice, onOpen, onAddQuote, inQuote 
         <div className="card-name">{product.name}</div>
         <div className="card-tag">{product.tagline}</div>
         <div className="card-foot">
-          {showPrice
-            ? <div className="card-price mono">{fmtCOP(product.price)}</div>
-            : <div className="card-price mono muted">Consultar precio</div>}
+          <div className="card-price-row">
+            {showPrice
+              ? <div className="card-price mono">{fmtCOP(product.price)}</div>
+              : <div className="card-price mono muted">Consultar precio</div>}
+          </div>
           <button className={`quote-btn ${inQuote ? 'on' : ''}`}
-                  onClick={(e) => { e.stopPropagation(); onAddQuote(product); }}
-                  aria-label={inQuote ? 'Quitar de cotización' : 'Agregar a cotización'}>
-            {inQuote ? <IconCheck size={16}/> : <IconPlus size={16}/>}
+                  onClick={(e) => { e.stopPropagation(); onAddQuote(product); }}>
+            {inQuote
+              ? <><IconCheck size={15}/> En cotización</>
+              : <><IconPlus size={15}/> Agregar</>}
           </button>
         </div>
       </div>
