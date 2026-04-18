@@ -1,0 +1,23 @@
+# Runtime / local state
+__pycache__/
+*.py[cod]
+*.log
+
+# Local env and secrets
+.env
+.env.*
+!.env.example
+
+# Business data and generated artifacts
+rc_domotic.db
+# Mantener uploads de productos en repo (catálogo visual en producción)
+uploads/*
+!uploads/products/
+!uploads/products/**
+backups/
+exports/
+tmp/
+
+# OS / editor
+.DS_Store
+Thumbs.db
