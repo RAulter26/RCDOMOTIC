@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Cotizaciones Catálogo · RC Domotic</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #0f0f12; --bg1: #18181f; --bg2: #22222c;
+  --accent: oklch(0.86 0.22 148); --line: #2a2a35;
+  --fg: #f0f0f4; --fg2: #9898a8; --fg3: #5a5a6a;
+  --red: #ff6b6b; --green: #69db7c; --yellow: #ffd43b;
+  --radius: 12px; --font: 'Inter', system-ui, sans-serif;
+}
+body { background: var(--bg); color: var(--fg); font-family: var(--font); min-height: 100vh; }
+.topbar {
+  position: sticky; top: 0; z-index: 10;
+  background: color-mix(in oklab, var(--bg) 90%, transparent);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--line);
+  display: flex; align-items: center; gap: 16px;
+  padding: 14px 24px;
+}
+.topbar-logo { font-size: 13px; font-weight: 700; letter-spacing: 0.08em; color: var(--accent); }
+.topbar-title { font-size: 14px; color: var(--fg2); }
+.topbar-back { margin-left: auto; font-size: 13px; color: var(--fg2); text-decoration: none; }
+.topbar-back:hover { color: var(--fg); }
+.container { max-width: 1100px; margin: 0 auto; padding: 28px 20px; }
+.page-title { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 6px; }
+.page-sub { font-size: 14px; color: var(--fg2); margin-bottom: 24px; }
+.filters { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+.filter-btn {
+  padding: 6px 14px; border-radius: 999px; border: 1px solid var(--line);
+  background: transparent; color: var(--fg2); font-size: 12px; cursor: pointer;
+  transition: all .15s;
+}
+.filter-btn.active, .filter-btn:hover { background: var(--accent); color: #051a0f; border-color: var(--accent); }
+.stats-row { display: flex; gap: 14px; margin-bottom: 24px; flex-wrap: wrap; }
+.stat-card {
+  background: var(--bg1); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 14px 20px; flex: 1; min-width: 140px;
+}
+.stat-label { font-size: 10px; letter-spacing: 0.12em; color: var(--fg3); margin-bottom: 4px; }
+.stat-val { font-size: 22px; font-weight: 700; color: var(--accent); }
+.quotes-list { display: flex; flex-direction: column; gap: 10px; }
+.quote-card {
+  background: var(--bg1); border: 1px solid var(--line); border-radius: var(--radius);
+  overflow: hidden; transition: border-color .2s;
+}
+.quote-card:hover { border-color: color-mix(in oklab, var(--accent) 40%, transparent); }
+.quote-head {
+  display: flex; align-items: center; gap: 14px; padding: 14px 18px;
+  cursor: pointer; user-select: none;
+}
+.quote-num { font-size: 11px; color: var(--fg3); font-family: monospace; min-width: 28px; }
+.quote-client { font-size: 14px; font-weight: 500; }
+.quote-contact { font-size: 12px; color: var(--fg2); margin-top: 2px; }
+.quote-meta { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+.quote-date { font-size: 12px; color: var(--fg3); }
+.badge {
+  padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 600;
+  letter-spacing: 0.06em;
+}
+.badge-nuevo { background: color-mix(in oklab, var(--accent) 15%, transparent); color: var(--accent); }
+.badge-visto { background: color-mix(in oklab, var(--yellow) 15%, transparent); color: var(--yellow); }
+.badge-cerrado { background: color-mix(in oklab, var(--green) 15%, transparent); color: var(--green); }
+.badge-descartado { background: color-mix(in oklab, var(--red) 15%, transparent); color: var(--red); }
+.quote-items-count { font-size: 12px; color: var(--fg3); }
+.quote-body { display: none; border-top: 1px solid var(--line); padding: 18px; }
+.quote-body.open { display: block; }
+.items-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 16px; }
+.items-table th { text-align: left; padding: 6px 8px; font-size: 10px; letter-spacing: 0.1em; color: var(--fg3); border-bottom: 1px solid var(--line); }
+.items-table td { padding: 8px; border-bottom: 1px solid color-mix(in oklab, var(--line) 50%, transparent); }
+.items-table tr:last-child td { border-bottom: none; }
+.edit-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; align-items: flex-end; }
+.edit-group { display: flex; flex-direction: column; gap: 5px; }
+.edit-group label { font-size: 10px; letter-spacing: 0.1em; color: var(--fg3); }
+.edit-group input, .edit-group select, .edit-group textarea {
+  background: var(--bg2); border: 1px solid var(--line); border-radius: 8px;
+  padding: 8px 11px; color: var(--fg); font-size: 13px; font-family: var(--font);
+  outline: none; transition: border-color .18s;
+}
+.edit-group input:focus, .edit-group select:focus, .edit-group textarea:focus { border-color: var(--accent); }
+.edit-group textarea { resize: vertical; min-height: 60px; }
+.action-row { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+.btn {
+  padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 500;
+  cursor: pointer; border: none; transition: all .15s; text-decoration: none;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.btn-primary { background: var(--accent); color: #051a0f; }
+.btn-primary:hover { filter: brightness(1.1); }
+.btn-ghost { background: transparent; border: 1px solid var(--line); color: var(--fg2); }
+.btn-ghost:hover { border-color: var(--fg2); color: var(--fg); }
+.btn-danger { background: transparent; border: 1px solid var(--line); color: var(--red); }
+.btn-danger:hover { background: color-mix(in oklab, var(--red) 15%, transparent); }
+.btn-wa { background: #25d366; color: #000; }
+.btn-wa:hover { filter: brightness(1.1); }
+.empty { text-align: center; padding: 60px 20px; color: var(--fg3); }
+.empty-icon { font-size: 48px; margin-bottom: 12px; }
+.loading { text-align: center; padding: 60px 20px; color: var(--fg3); }
+.total-row { display: flex; justify-content: flex-end; padding: 8px 0; }
+.total-label { font-size: 12px; color: var(--fg3); margin-right: 10px; }
+.total-val { font-size: 15px; font-weight: 600; color: var(--accent); }
+.toast {
+  position: fixed; bottom: 24px; right: 24px; z-index: 999;
+  background: var(--bg2); border: 1px solid var(--accent); border-radius: 10px;
+  padding: 12px 18px; font-size: 13px; color: var(--fg);
+  animation: fadeIn .2s ease; display: none;
+}
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-logo">RC DOMOTIC</div>
+  <div class="topbar-title">/ Cotizaciones Catálogo</div>
+  <a class="topbar-back" href="/">← Volver al app</a>
+</div>
+
+<div class="container">
+  <div class="page-title">Cotizaciones del Catálogo</div>
+  <div class="page-sub">Solicitudes recibidas desde catalogo.rcdomotic.com</div>
+
+  <div class="stats-row" id="statsRow"></div>
+
+  <div class="filters" id="filters">
+    <button class="filter-btn active" data-estado="TODOS" onclick="setFilter(this)">Todos</button>
+    <button class="filter-btn" data-estado="NUEVO" onclick="setFilter(this)">Nuevos</button>
+    <button class="filter-btn" data-estado="VISTO" onclick="setFilter(this)">Vistos</button>
+    <button class="filter-btn" data-estado="CERRADO" onclick="setFilter(this)">Cerrados</button>
+    <button class="filter-btn" data-estado="DESCARTADO" onclick="setFilter(this)">Descartados</button>
+  </div>
+
+  <div class="quotes-list" id="quotesList"><div class="loading">Cargando...</div></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let allQuotes = [];
+let currentFilter = 'TODOS';
+
+async function load() {
+  const r = await fetch('/api/admin/catalog-quotes');
+  if (!r.ok) { document.getElementById('quotesList').innerHTML = '<div class="empty"><div class="empty-icon">🔒</div>Sin acceso. <a href="/" style="color:var(--accent)">Iniciar sesión</a></div>'; return; }
+  allQuotes = await r.json();
+  renderStats();
+  renderList();
+}
+
+function renderStats() {
+  const total = allQuotes.length;
+  const nuevos = allQuotes.filter(q => q.estado === 'NUEVO').length;
+  const cerrados = allQuotes.filter(q => q.estado === 'CERRADO').length;
+  document.getElementById('statsRow').innerHTML = `
+    <div class="stat-card"><div class="stat-label">TOTAL</div><div class="stat-val">${total}</div></div>
+    <div class="stat-card"><div class="stat-label">NUEVOS</div><div class="stat-val" style="color:var(--accent)">${nuevos}</div></div>
+    <div class="stat-card"><div class="stat-label">CERRADOS</div><div class="stat-val" style="color:var(--green)">${cerrados}</div></div>
+  `;
+}
+
+function setFilter(btn) {
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  currentFilter = btn.dataset.estado;
+  renderList();
+}
+
+function fmtCOP(n) { return n > 0 ? '$' + n.toLocaleString('es-CO') : 'A consultar'; }
+function fmtDate(s) { return new Date(s).toLocaleString('es-CO', { dateStyle: 'medium', timeStyle: 'short' }); }
+function badgeClass(e) { return `badge badge-${(e||'nuevo').toLowerCase()}`; }
+
+function renderList() {
+  const list = currentFilter === 'TODOS' ? allQuotes : allQuotes.filter(q => q.estado === currentFilter);
+  const el = document.getElementById('quotesList');
+  if (!list.length) { el.innerHTML = '<div class="empty"><div class="empty-icon">📋</div>Sin cotizaciones aquí</div>'; return; }
+  el.innerHTML = list.map((q, i) => {
+    const items = JSON.parse(q.items_json || '[]');
+    const clientDisplay = q.client_name || q.client_phone || q.client_email || 'Cliente anónimo';
+    const contact = [q.client_phone, q.client_email].filter(Boolean).join(' · ');
+    return `
+    <div class="quote-card" id="card-${q.id}">
+      <div class="quote-head" onclick="toggle(${q.id})">
+        <div class="quote-num">#${q.id}</div>
+        <div>
+          <div class="quote-client">${clientDisplay}</div>
+          ${contact ? `<div class="quote-contact">${contact}</div>` : ''}
+        </div>
+        <div class="quote-meta">
+          <span class="quote-items-count">${items.length} producto${items.length!==1?'s':''}</span>
+          <span class="quote-date">${fmtDate(q.created_at)}</span>
+          <span class="${badgeClass(q.estado)}">${q.estado}</span>
+        </div>
+      </div>
+      <div class="quote-body" id="body-${q.id}">
+        <table class="items-table">
+          <thead><tr><th>#</th><th>PRODUCTO</th><th>ID</th><th>CANT.</th><th>PRECIO</th></tr></thead>
+          <tbody>
+            ${items.map((it,j) => `<tr>
+              <td style="color:var(--fg3)">${j+1}</td>
+              <td>${it.name}</td>
+              <td style="color:var(--fg3);font-family:monospace">${it.id||''}</td>
+              <td>${it.qty||1}</td>
+              <td>${it.price > 0 ? fmtCOP(it.price * (it.qty||1)) : 'A consultar'}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+        ${q.total > 0 ? `<div class="total-row"><span class="total-label">TOTAL ESTIMADO</span><span class="total-val">${fmtCOP(q.total)}</span></div>` : ''}
+
+        <div class="edit-row">
+          <div class="edit-group">
+            <label>ESTADO</label>
+            <select id="estado-${q.id}" onchange="updateField(${q.id},'estado',this.value)">
+              ${['NUEVO','VISTO','CERRADO','DESCARTADO'].map(e => `<option value="${e}" ${q.estado===e?'selected':''}>${e}</option>`).join('')}
+            </select>
+          </div>
+          <div class="edit-group" style="flex:1;min-width:200px">
+            <label>NOTAS INTERNAS</label>
+            <textarea id="notas-${q.id}" placeholder="Agrega notas, seguimiento...">${q.notas||''}</textarea>
+          </div>
+        </div>
+
+        <div class="action-row">
+          <button class="btn btn-primary" onclick="saveNotas(${q.id})">💾 Guardar notas</button>
+          ${q.client_phone ? `<a class="btn btn-wa" href="${waLink(q)}" target="_blank">💬 WhatsApp</a>` : ''}
+          <button class="btn btn-danger" onclick="deleteQuote(${q.id})">🗑 Eliminar</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggle(id) {
+  const body = document.getElementById('body-' + id);
+  body.classList.toggle('open');
+  if (body.classList.contains('open')) {
+    const q = allQuotes.find(x => x.id === id);
+    if (q && q.estado === 'NUEVO') updateField(id, 'estado', 'VISTO', false);
+  }
+}
+
+function waLink(q) {
+  const items = JSON.parse(q.items_json || '[]');
+  let m = '*Seguimiento Cotización — RC Domotic*\n\n';
+  if (q.client_name) m += `👤 ${q.client_name}\n`;
+  m += '\n*Productos cotizados:*\n';
+  items.forEach((it,i) => { m += `${String(i+1).padStart(2,'0')}. ${it.name} x${it.qty||1}\n`; });
+  if (q.total > 0) m += `\n*TOTAL estimado:* ${fmtCOP(q.total)}`;
+  return `https://wa.me/${q.client_phone.replace(/\D/g,'')}?text=${encodeURIComponent(m)}`;
+}
+
+async function updateField(id, field, value, showToast=true) {
+  const body = { [field]: value };
+  await fetch(`/api/admin/catalog-quotes/${id}`, { method: 'PATCH', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+  const q = allQuotes.find(x => x.id === id);
+  if (q) q[field] = value;
+  if (field === 'estado') { renderStats(); if (showToast) toast('Estado actualizado'); }
+}
+
+async function saveNotas(id) {
+  const notas = document.getElementById('notas-' + id).value;
+  await fetch(`/api/admin/catalog-quotes/${id}`, { method: 'PATCH', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ notas }) });
+  const q = allQuotes.find(x => x.id === id);
+  if (q) q.notas = notas;
+  toast('Notas guardadas ✓');
+}
+
+async function deleteQuote(id) {
+  if (!confirm('¿Eliminar esta cotización?')) return;
+  await fetch(`/api/admin/catalog-quotes/${id}`, { method: 'DELETE' });
+  allQuotes = allQuotes.filter(q => q.id !== id);
+  renderStats(); renderList();
+  toast('Eliminado');
+}
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.style.display = 'block';
+  setTimeout(() => { t.style.display = 'none'; }, 2500);
+}
+
+load();
+setInterval(load, 60000);
+</script>
+</body>
+</html>

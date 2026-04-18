@@ -1458,12 +1458,21 @@ const QuoteDrawer = ({ open, onClose, items, setItems, showPrice }) => {
             <button className="btn ghost" style={{flex:'0 0 auto'}} onClick={() => setShowForm(false)}>Cancelar</button>
             <a className="btn primary whatsapp flex" style={{flex:1,justifyContent:'center'}}
                href={waLink(buildMessage(client))} target="_blank" rel="noreferrer"
-               onClick={() => setShowForm(false)}>
+               onClick={() => {
+                 setShowForm(false);
+                 fetch('/api/catalog/save-quote', {
+                   method: 'POST',
+                   headers: {'Content-Type':'application/json'},
+                   body: JSON.stringify({
+                     client_name: client.name,
+                     client_phone: client.phone,
+                     client_email: client.email,
+                     items: items.map(it => ({ id: it.id, name: it.name, qty: it.qty, price: it.price, cat: it.cat }))
+                   })
+                 });
+               }}>
               <IconWhatsapp size={16}/> Enviar
             </a>
-          </div>
-          <div className="client-skip" onClick={() => { window.open(waLink(buildMessage({})), '_blank'); setShowForm(false); }}>
-            Enviar sin datos de cliente →
           </div>
         </div>
       </div>

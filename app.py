@@ -1233,6 +1233,19 @@ CREATE TABLE IF NOT EXISTS crm_actividades (
     nota          TEXT DEFAULT '',
     proxima_fecha TEXT DEFAULT ''
 );
+
+-- COTIZACIONES DESDE CATÁLOGO PÚBLICO
+CREATE TABLE IF NOT EXISTS catalog_quotes (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at    TEXT DEFAULT (datetime('now','localtime')),
+    client_name   TEXT DEFAULT '',
+    client_phone  TEXT DEFAULT '',
+    client_email  TEXT DEFAULT '',
+    items_json    TEXT NOT NULL,
+    total         REAL DEFAULT 0,
+    estado        TEXT DEFAULT 'NUEVO',
+    notas         TEXT DEFAULT ''
+);
 """
 
 PRODUCTOS = [
@@ -4822,8 +4835,69 @@ def serve_index():
 @app.get('/catalog')
 @app.get('/catalogo')
 def serve_catalog():
-    """Catálogo público standalone — para catalogo.rcdomotic.com."""
     return send_file(os.path.join(BASE_DIR, 'catalog.html'))
+
+
+# ── CATALOG QUOTES (cotizaciones del catálogo público) ─────────────────────
+
+@app.post('/api/catalog/save-quote')
+def catalog_save_quote():
+    """Guarda una cotización enviada desde el catálogo público."""
+    data = request.get_json(silent=True) or {}
+    items = data.get('items', [])
+    if not items:
+        return jsonify({'ok': False, 'error': 'sin items'}), 400
+    total = sum(it.get('price', 0) * it.get('qty', 1) for it in items)
+    import json as _json
+    db = get_db()
+    cur = db.execute(
+        """INSERT INTO catalog_quotes (client_name, client_phone, client_email, items_json, total)
+           VALUES (?,?,?,?,?)""",
+        (data.get('client_name',''), data.get('client_phone',''),
+         data.get('client_email',''), _json.dumps(items, ensure_ascii=False), total)
+    )
+    db.commit()
+    return jsonify({'ok': True, 'id': cur.lastrowid})
+
+
+@app.get('/api/admin/catalog-quotes')
+@role_required('admin')
+def catalog_quotes_list():
+    import json as _json
+    rows = get_db().execute(
+        "SELECT * FROM catalog_quotes ORDER BY created_at DESC LIMIT 200"
+    ).fetchall()
+    return jsonify([dict(r) for r in rows])
+
+
+@app.patch('/api/admin/catalog-quotes/<int:qid>')
+@role_required('admin')
+def catalog_quotes_update(qid):
+    data = request.get_json(silent=True) or {}
+    allowed = {'client_name','client_phone','client_email','estado','notas'}
+    sets = {k: v for k,v in data.items() if k in allowed}
+    if not sets:
+        return jsonify({'ok': False, 'error': 'nada que actualizar'}), 400
+    sql = 'UPDATE catalog_quotes SET ' + ', '.join(f'{k}=?' for k in sets) + ' WHERE id=?'
+    db = get_db()
+    db.execute(sql, list(sets.values()) + [qid])
+    db.commit()
+    return jsonify({'ok': True})
+
+
+@app.delete('/api/admin/catalog-quotes/<int:qid>')
+@role_required('admin')
+def catalog_quotes_delete(qid):
+    db = get_db()
+    db.execute('DELETE FROM catalog_quotes WHERE id=?', (qid,))
+    db.commit()
+    return jsonify({'ok': True})
+
+
+@app.get('/catalog-quotes')
+@role_required('admin')
+def catalog_quotes_page():
+    return send_file(os.path.join(BASE_DIR, 'catalog_quotes.html'))
 
 
 @app.get('/print/inventario')
