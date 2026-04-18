@@ -1000,6 +1000,11 @@ def _require_admin_reauth_for_action(data, target_action='admin_action'):
 
 
 @app.before_request
+def _redirect_catalog_subdomain():
+    if request.host.startswith('catalogo.') and request.path == '/':
+        return redirect('/catalog', code=301)
+
+@app.before_request
 def _enforce_auth_for_api():
     """Protege /api/* con sesiÃ³n y valida CSRF en mÃ©todos de escritura.
     Se dejan abiertos /api/login y /api/me (para bootstrap/login).
