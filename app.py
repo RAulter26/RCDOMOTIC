@@ -6,7 +6,7 @@ v3: Fix Excel, Selector categorÃ­as, Merge duplicados, Logo+Watermark PDF,
 import sqlite3, os, json, datetime, re, uuid, traceback, secrets, time, ipaddress, socket, unicodedata, shutil, threading
 from functools import wraps
 from flask import (Flask, request, jsonify, g, send_file, session,
-                   render_template_string, send_from_directory, abort)
+                   render_template_string, send_from_directory, abort, redirect)
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.middleware.proxy_fix import ProxyFix
