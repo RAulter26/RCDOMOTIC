@@ -633,6 +633,32 @@ input { font-family: inherit; }
 .clear-all { align-self: center; font-size: 12px; color: var(--fg-3); }
 .clear-all:hover { color: #ff9999; }
 
+/* CLIENT FORM */
+.client-overlay {
+  position: fixed; inset: 0; z-index: 600;
+  background: rgba(0,0,0,0.7); backdrop-filter: blur(6px);
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+.client-card {
+  background: var(--bg-1); border: 1px solid var(--line-soft);
+  border-radius: var(--radius); padding: 28px 26px; width: 100%; max-width: 360px;
+}
+.client-title { font-size: 18px; font-weight: 600; letter-spacing: -0.02em; margin: 0 0 4px; }
+.client-sub { font-size: 13px; color: var(--fg-2); margin: 0 0 22px; }
+.client-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.client-field label { font-size: 10.5px; letter-spacing: 0.12em; color: var(--fg-3); font-family: var(--font-mono); }
+.client-field input {
+  background: var(--bg-0); border: 1px solid var(--line-soft);
+  border-radius: 8px; padding: 10px 13px; color: var(--fg);
+  font-size: 14px; outline: none; transition: border-color .18s;
+  font-family: inherit;
+}
+.client-field input:focus { border-color: var(--accent); }
+.client-field input::placeholder { color: var(--fg-3); }
+.client-btns { display: flex; gap: 10px; margin-top: 22px; }
+.client-skip { font-size: 12px; color: var(--fg-3); text-align: center; margin-top: 12px; cursor: pointer; }
+.client-skip:hover { color: var(--fg-1); }
+
 /* FAB */
 .fab {
   position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
@@ -1389,9 +1415,16 @@ const QuoteDrawer = ({ open, onClose, items, setItems, showPrice }) => {
   const changeQty  = (id, delta) => setItems(items.map(it => it.id === id ? { ...it, qty: Math.max(1, it.qty + delta) } : it));
   const removeItem = (id) => setItems(items.filter(it => it.id !== id));
   const clearAll   = () => setItems([]);
+  const [showForm, setShowForm] = React.useState(false);
+  const [client, setClient] = React.useState({ name: '', phone: '', email: '' });
 
-  const buildMessage = () => {
-    let m = '*Cotización RC Domotic*\n\n';
+  const buildMessage = (c) => {
+    let m = '*Solicitud de Cotización — RC Domotic*\n\n';
+    if (c && c.name)  m += `👤 *Nombre:* ${c.name}\n`;
+    if (c && c.phone) m += `📱 *Teléfono:* ${c.phone}\n`;
+    if (c && c.email) m += `📧 *Correo:* ${c.email}\n`;
+    if (c && (c.name || c.phone || c.email)) m += '\n';
+    m += '*Productos:*\n';
     items.forEach((it, i) => {
       m += `${String(i+1).padStart(2,'0')}. ${it.name} x${it.qty}`;
       if (showPrice && it.price > 0) m += ` — ${fmtCOP(it.price * it.qty)}`;
@@ -1403,6 +1436,38 @@ const QuoteDrawer = ({ open, onClose, items, setItems, showPrice }) => {
   };
 
   return (
+    <React.Fragment>
+    {showForm && (
+      <div className="client-overlay" onClick={e => { if(e.target===e.currentTarget) setShowForm(false); }}>
+        <div className="client-card">
+          <div className="client-title">¿Quién solicita?</div>
+          <div className="client-sub">Tus datos aparecerán en el mensaje de WhatsApp</div>
+          <div className="client-field">
+            <label>NOMBRE</label>
+            <input placeholder="Tu nombre completo" value={client.name} onChange={e => setClient({...client, name: e.target.value})}/>
+          </div>
+          <div className="client-field">
+            <label>CELULAR</label>
+            <input placeholder="+57 300 000 0000" value={client.phone} onChange={e => setClient({...client, phone: e.target.value})}/>
+          </div>
+          <div className="client-field">
+            <label>CORREO</label>
+            <input placeholder="tu@correo.com" type="email" value={client.email} onChange={e => setClient({...client, email: e.target.value})}/>
+          </div>
+          <div className="client-btns">
+            <button className="btn ghost" style={{flex:'0 0 auto'}} onClick={() => setShowForm(false)}>Cancelar</button>
+            <a className="btn primary whatsapp flex" style={{flex:1,justifyContent:'center'}}
+               href={waLink(buildMessage(client))} target="_blank" rel="noreferrer"
+               onClick={() => setShowForm(false)}>
+              <IconWhatsapp size={16}/> Enviar
+            </a>
+          </div>
+          <div className="client-skip" onClick={() => { window.open(waLink(buildMessage({})), '_blank'); setShowForm(false); }}>
+            Enviar sin datos de cliente →
+          </div>
+        </div>
+      </div>
+    )}
     <Drawer
       open={open} side="right" onClose={onClose}
       title={`Cotización · ${items.length}`}
@@ -1415,9 +1480,9 @@ const QuoteDrawer = ({ open, onClose, items, setItems, showPrice }) => {
             </div>
           )}
           <div className="quote-foot-btns">
-            <a className="btn primary whatsapp flex" href={waLink(buildMessage())} target="_blank" rel="noreferrer">
+            <button className="btn primary whatsapp flex" onClick={() => setShowForm(true)}>
               <IconWhatsapp size={16}/> Enviar por WhatsApp
-            </a>
+            </button>
           </div>
           <button className="btn ghost small clear-all" onClick={clearAll}>
             <IconTrash size={14}/> Vaciar cotización
@@ -1461,6 +1526,7 @@ const QuoteDrawer = ({ open, onClose, items, setItems, showPrice }) => {
         </div>
       )}
     </Drawer>
+    </React.Fragment>
   );
 };
 
