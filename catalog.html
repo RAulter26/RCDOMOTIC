@@ -1,0 +1,1592 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<meta name="theme-color" content="#0a0a0b"/>
+<meta name="description" content="RC Domotic — Catálogo showroom: domótica, CCTV, audio premium, cerraduras digitales, redes WiFi. Bogotá, Medellín, Cali."/>
+<meta property="og:title" content="RC Domotic · Catálogo Showroom 2026"/>
+<meta property="og:description" content="Hogares inteligentes. Espacios premium. Domótica, CCTV, audio de referencia y conectividad profesional."/>
+<meta property="og:type" content="website"/>
+<title>RC Domotic · Catálogo Showroom</title>
+
+<!-- Favicon inline -->
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64' fill='none'><rect width='64' height='64' rx='14' fill='%230a0a0b'/><rect x='8' y='18' width='42' height='28' rx='4' stroke='%23fff' stroke-width='2.4'/><path d='M42 18V12' stroke='%23fff' stroke-width='2.4' stroke-linecap='round'/><circle cx='42' cy='10' r='2' fill='%23fff'/><text x='14' y='38' font-family='sans-serif' font-weight='700' font-size='15' fill='%23fff' letter-spacing='0.5'>RC</text><path d='M34 36a3.5 3.5 0 0 1 3.5 3.5M31 36a6.5 6.5 0 0 1 6.5 6.5' stroke='%2339ff8c' stroke-width='1.8' stroke-linecap='round'/><circle cx='31' cy='42.5' r='1' fill='%2339ff8c'/></svg>"/>
+
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+
+<style>
+/* RC Domotic — Showroom premium · oscuro profundo + verde neón tech */
+
+:root {
+  --bg-0: oklch(0.12 0.004 240);
+  --bg-1: oklch(0.16 0.004 240);
+  --bg-2: oklch(0.20 0.004 240);
+  --bg-3: oklch(0.25 0.004 240);
+  --line: oklch(0.28 0.004 240);
+  --line-soft: oklch(0.22 0.004 240);
+  --fg: oklch(0.98 0 0);
+  --fg-1: oklch(0.78 0.004 240);
+  --fg-2: oklch(0.58 0.004 240);
+  --fg-3: oklch(0.42 0.004 240);
+  --accent: oklch(0.86 0.22 148);
+  --accent-2: oklch(0.72 0.22 148);
+  --accent-soft: oklch(0.86 0.22 148 / 0.14);
+  --accent-glow: oklch(0.86 0.22 148 / 0.35);
+  --wa: oklch(0.72 0.17 148);
+  --radius: 14px;
+  --radius-lg: 20px;
+  --font-display: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+  --font-ui: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; padding: 0; background: var(--bg-0); color: var(--fg); font-family: var(--font-ui); }
+body {
+  font-size: 15px; line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+button { font-family: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+a { color: inherit; text-decoration: none; }
+input { font-family: inherit; }
+
+.mono { font-family: var(--font-mono); letter-spacing: 0.02em; }
+.muted { color: var(--fg-2); }
+.dim { color: var(--fg-3); }
+
+/* ============ APP SHELL ============ */
+.app {
+  min-height: 100vh;
+  max-width: 1240px; margin: 0 auto;
+  padding-bottom: 80px;
+}
+
+/* HEADER */
+.top {
+  position: sticky; top: 0; z-index: 30;
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 18px;
+  background: color-mix(in oklab, var(--bg-0) 88%, transparent);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border-bottom: 1px solid var(--line-soft);
+}
+.brand {
+  display: flex; align-items: center; gap: 10px;
+  margin: 0 auto 0 6px;
+}
+.brand-logo {
+  width: 34px; height: 34px; border-radius: 8px; object-fit: cover;
+  filter: brightness(1.05) contrast(1.05);
+  background: #000;
+}
+.brand-stack { display: flex; flex-direction: column; align-items: flex-start; line-height: 1; }
+.brand-name { font-family: var(--font-display); font-weight: 700; letter-spacing: 0.04em; font-size: 14px; }
+.brand-sub  { font-family: var(--font-mono); font-size: 9.5px; color: var(--fg-3); margin-top: 3px; letter-spacing: 0.08em; }
+
+.top-right { display: flex; align-items: center; gap: 10px; margin-left: auto; }
+.icon-btn {
+  width: 40px; height: 40px; display: grid; place-items: center;
+  border-radius: 12px; color: var(--fg-1);
+  border: 1px solid var(--line-soft);
+  background: var(--bg-1);
+  transition: all .18s ease;
+}
+.icon-btn:hover { background: var(--bg-2); color: var(--fg); border-color: var(--line); }
+.quote-toggle { position: relative; }
+.badge {
+  position: absolute; top: -6px; right: -6px;
+  min-width: 18px; height: 18px; padding: 0 5px;
+  border-radius: 9px; background: var(--accent); color: #051a0f;
+  font-size: 10px; font-weight: 700; display: grid; place-items: center;
+  box-shadow: 0 0 10px var(--accent-glow);
+}
+.price-indicator {
+  font-size: 10px; font-weight: 700; padding: 4px 8px; border-radius: 6px;
+  background: var(--accent-soft); color: var(--accent);
+  border: 1px solid color-mix(in oklab, var(--accent) 35%, transparent);
+  letter-spacing: 0.08em;
+}
+
+/* SUBNAV */
+.subnav {
+  display: flex; align-items: center; gap: 10px;
+  padding: 14px 20px 0; color: var(--fg-2); font-size: 12px;
+}
+.subnav .link { display: inline-flex; gap: 6px; align-items: center; }
+.subnav .link:hover { color: var(--accent); }
+.subnav .sep { color: var(--fg-3); }
+.subnav .mono { font-size: 11px; color: var(--fg-2); letter-spacing: 0.12em; }
+
+/* ============ HOME ============ */
+.home { padding: 20px 20px 40px; display: flex; flex-direction: column; gap: 56px; }
+
+/* HERO */
+.hero {
+  position: relative;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(120% 80% at 80% 0%, color-mix(in oklab, var(--accent) 8%, transparent), transparent 55%),
+    linear-gradient(180deg, var(--bg-1), var(--bg-0));
+  padding: 54px 32px 28px;
+  overflow: hidden;
+}
+.hero-grid {
+  position: absolute; inset: 0; pointer-events: none;
+  display: grid; grid-template-columns: repeat(4, 1fr); opacity: 0.35;
+}
+.hero-row {
+  border-right: 1px solid color-mix(in oklab, var(--line) 60%, transparent);
+  border-left: 0;
+}
+.hero-row:last-child { border-right: 0; }
+.hero-eyebrow {
+  display: inline-flex; align-items: center; gap: 10px;
+  font-size: 11px; color: var(--accent); letter-spacing: 0.14em;
+  padding: 7px 12px; border-radius: 999px;
+  background: var(--accent-soft);
+  border: 1px solid color-mix(in oklab, var(--accent) 30%, transparent);
+}
+.hero-eyebrow .pulse {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--accent); box-shadow: 0 0 10px var(--accent-glow);
+  animation: pulse 1.6s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100% {opacity:1; transform: scale(1);} 50% {opacity:.5; transform: scale(.75);} }
+
+.hero-title {
+  font-family: var(--font-display);
+  font-size: clamp(40px, 7vw, 76px);
+  line-height: 0.98; letter-spacing: -0.03em;
+  font-weight: 600; margin: 20px 0 16px;
+  text-wrap: balance;
+}
+.hero-title em {
+  font-style: normal; color: var(--accent);
+  text-shadow: 0 0 24px color-mix(in oklab, var(--accent) 40%, transparent);
+}
+.hero-sub {
+  color: var(--fg-1); max-width: 560px; margin: 0 0 28px;
+  font-size: clamp(15px, 1.6vw, 17px); text-wrap: pretty;
+}
+.hero-ctas { display: flex; flex-wrap: wrap; gap: 10px; }
+.hero-meta {
+  margin-top: 40px; padding-top: 20px;
+  border-top: 1px dashed var(--line);
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+}
+.hero-meta > div { display: flex; flex-direction: column; gap: 4px; }
+.hero-meta .num { font-size: 22px; color: var(--fg); font-family: var(--font-mono); font-weight: 600; }
+.hero-meta span:last-child { color: var(--fg-2); font-size: 12px; }
+
+/* BUTTONS */
+.btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 13px 20px; border-radius: 12px;
+  font-size: 14px; font-weight: 500; letter-spacing: 0.01em;
+  border: 1px solid transparent; transition: all .18s ease;
+  cursor: pointer;
+}
+.btn.small { padding: 9px 14px; font-size: 13px; border-radius: 10px; }
+.btn.primary {
+  background: var(--accent); color: #04140a;
+  box-shadow: 0 0 0 1px var(--accent), 0 8px 20px -8px var(--accent-glow);
+}
+.btn.primary:hover { background: oklch(from var(--accent) calc(l + 0.04) c h); transform: translateY(-1px); }
+.btn.ghost {
+  background: var(--bg-1); color: var(--fg-1);
+  border-color: var(--line-soft);
+}
+.btn.ghost:hover { background: var(--bg-2); color: var(--fg); border-color: var(--line); }
+.btn.solid {
+  background: var(--bg-2); color: var(--fg); border-color: var(--line);
+}
+.btn.solid.added { background: var(--accent-soft); border-color: color-mix(in oklab, var(--accent) 40%, transparent); color: var(--accent); }
+.btn.whatsapp { background: var(--wa); color: #04140a; }
+.btn.whatsapp:hover { background: oklch(from var(--wa) calc(l + 0.04) c h); }
+.btn.flex { flex: 1; justify-content: center; }
+
+/* SECTION HEAD */
+.section-head { margin-bottom: 28px; }
+.section-kicker { font-size: 11px; color: var(--fg-3); letter-spacing: 0.18em; margin-bottom: 10px; }
+.section-title {
+  font-family: var(--font-display);
+  font-size: clamp(26px, 4vw, 38px);
+  font-weight: 600; letter-spacing: -0.02em; margin: 0;
+  line-height: 1.05;
+}
+.section-title em { font-style: normal; color: var(--accent); }
+
+/* CATS */
+.cats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
+.cat-card {
+  text-align: left; padding: 22px 18px 20px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  background: var(--bg-1);
+  transition: all .22s cubic-bezier(.22,.8,.2,1);
+  position: relative; overflow: hidden;
+  display: flex; flex-direction: column; gap: 16px;
+  min-height: 190px;
+}
+.cat-card::after {
+  content: ''; position: absolute; inset: 0;
+  background: radial-gradient(120% 80% at 100% 0%, var(--accent-soft), transparent 55%);
+  opacity: 0; transition: opacity .3s ease;
+  pointer-events: none;
+}
+.cat-card:hover { border-color: color-mix(in oklab, var(--accent) 45%, transparent); transform: translateY(-2px); }
+.cat-card:hover::after { opacity: 1; }
+.cat-card:hover .cat-glyph { color: var(--accent); }
+.cat-num { font-size: 10px; color: var(--fg-3); letter-spacing: 0.14em; }
+.cat-glyph {
+  color: var(--fg-1); transition: color .22s ease;
+  margin-top: auto;
+}
+.cat-name { font-weight: 500; font-size: 16px; letter-spacing: -0.01em; }
+.cat-meta { font-size: 10px; color: var(--fg-3); letter-spacing: 0.1em; }
+
+/* FEATURED */
+.featured-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+.feat-card {
+  position: relative;
+  aspect-ratio: 4/5;
+  border-radius: var(--radius);
+  overflow: hidden;
+  border: 1px solid var(--line-soft);
+  background: var(--bg-1);
+  cursor: pointer;
+  transition: transform .22s ease, border-color .22s ease;
+}
+.feat-card:hover { transform: translateY(-2px); border-color: color-mix(in oklab, var(--accent) 50%, transparent); }
+.feat-img { position: absolute; inset: 0; }
+.feat-over {
+  position: absolute; inset: auto 0 0 0; padding: 16px;
+  background: linear-gradient(180deg, transparent, rgba(0,0,0,0.85) 70%);
+  text-align: left;
+}
+.feat-cat { font-size: 10px; color: var(--accent); letter-spacing: 0.14em; margin-bottom: 6px; }
+.feat-name { font-weight: 500; font-size: 15px; letter-spacing: -0.01em; }
+
+/* HOME FOOT */
+.home-foot { margin-top: 20px; }
+.foot-line { height: 1px; background: var(--line); margin-bottom: 18px; }
+.foot-row { display: flex; justify-content: space-between; align-items: center; gap: 20px; }
+.foot-tag { margin-top: 4px; color: var(--fg-1); font-size: 13px; }
+.tiny { font-size: 10px; letter-spacing: 0.14em; }
+
+/* ============ CATALOG ============ */
+.catalog { padding: 10px 20px 20px; }
+.cat-search-bar { padding: 16px 0 12px; position: sticky; top: 67px; background: var(--bg-0); z-index: 10; }
+.search-wrap {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 14px; border-radius: 12px;
+  background: var(--bg-1); border: 1px solid var(--line-soft);
+  transition: border-color .18s ease;
+  color: var(--fg-2);
+}
+.search-wrap.focused { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); color: var(--accent); }
+.search-wrap input {
+  flex: 1; background: none; border: 0; outline: 0;
+  color: var(--fg); font-size: 14px;
+}
+.search-wrap input::placeholder { color: var(--fg-3); }
+.search-clear {
+  width: 24px; height: 24px; display: grid; place-items: center;
+  border-radius: 6px; color: var(--fg-2);
+}
+.search-clear:hover { background: var(--bg-2); color: var(--fg); }
+
+.chips-row {
+  overflow-x: auto; margin: 0 -20px;
+  padding: 0 20px 12px; scrollbar-width: none;
+}
+.chips-row::-webkit-scrollbar { display: none; }
+.chips { display: flex; gap: 8px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 9px 14px; border-radius: 999px;
+  background: var(--bg-1); border: 1px solid var(--line-soft);
+  color: var(--fg-1); font-size: 13px; white-space: nowrap;
+  transition: all .18s ease;
+}
+.chip:hover { border-color: var(--line); color: var(--fg); }
+.chip.on {
+  background: var(--fg); color: var(--bg-0); border-color: var(--fg);
+}
+.chip.on .chip-count { color: var(--bg-0); opacity: 0.5; }
+.chip-count { font-size: 10px; color: var(--fg-3); }
+
+.cat-hdr {
+  display: flex; justify-content: space-between; align-items: flex-end;
+  padding: 14px 0 18px;
+  border-bottom: 1px solid var(--line-soft); margin-bottom: 18px;
+}
+.kicker { font-size: 10px; color: var(--fg-3); letter-spacing: 0.18em; margin-bottom: 4px; }
+.cat-hdr-title { font-family: var(--font-display); font-size: 22px; font-weight: 500; letter-spacing: -0.02em; }
+.count-badge { font-size: 11px; color: var(--fg-2); letter-spacing: 0.08em; }
+
+.grid { display: grid; gap: 14px; }
+.grid.density-large { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+.grid.density-medium { grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px; }
+.grid.density-list { grid-template-columns: 1fr; gap: 6px; }
+
+/* ============ CARDS ============ */
+.card {
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  background: var(--bg-1);
+  overflow: hidden;
+  transition: all .22s cubic-bezier(.22,.8,.2,1);
+  display: flex; flex-direction: column;
+}
+.card:hover { border-color: color-mix(in oklab, var(--accent) 40%, transparent); transform: translateY(-2px); }
+.card-img-wrap {
+  position: relative; width: 100%; display: block;
+  background: #000; padding: 0; overflow: hidden;
+}
+.card.large .card-img { aspect-ratio: 4/3; }
+.card.medium .card-img { aspect-ratio: 5/4; }
+.card-img { position: relative; width: 100%; overflow: hidden; }
+.card-cat-pill {
+  position: absolute; top: 10px; left: 10px;
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 9px; border-radius: 999px;
+  font-size: 10px; letter-spacing: 0.1em; font-family: var(--font-mono);
+  background: color-mix(in oklab, var(--bg-0) 80%, transparent);
+  border: 1px solid var(--line-soft);
+  color: var(--accent);
+  backdrop-filter: blur(6px);
+}
+.card-body { padding: 14px; display: flex; flex-direction: column; gap: 4px; }
+.card-name { font-size: 14px; font-weight: 500; letter-spacing: -0.005em; line-height: 1.3; }
+.card-tag { color: var(--fg-2); font-size: 12px; margin-top: 2px; line-height: 1.4; text-wrap: pretty; }
+.card-foot {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-top: 12px; padding-top: 12px;
+  border-top: 1px dashed var(--line-soft);
+}
+.card-price { font-size: 14px; font-weight: 500; letter-spacing: 0; }
+.card-price.muted { color: var(--fg-3); font-size: 12px; letter-spacing: 0.02em; }
+.quote-btn {
+  width: 32px; height: 32px; border-radius: 9px;
+  background: var(--bg-2); color: var(--fg-1);
+  display: grid; place-items: center;
+  border: 1px solid var(--line-soft);
+  transition: all .18s ease;
+}
+.quote-btn:hover { background: var(--fg); color: var(--bg-0); }
+.quote-btn.on {
+  background: var(--accent); color: #04140a; border-color: var(--accent);
+  box-shadow: 0 0 10px var(--accent-glow);
+}
+
+/* LIST variant */
+.card.list {
+  flex-direction: row; align-items: center; gap: 14px;
+  padding: 10px; cursor: pointer;
+}
+.card.list .card-img { width: 64px; height: 64px; border-radius: 10px; flex-shrink: 0; overflow: hidden; }
+.card.list .card-body { flex: 1; padding: 0; gap: 2px; }
+.card.list .card-cat { font-size: 10px; color: var(--accent); letter-spacing: 0.1em; font-family: var(--font-mono); }
+.card.list .card-name { font-size: 14px; }
+.card.list .card-price { font-size: 12px; color: var(--fg-1); }
+.card.list .card-arrow { color: var(--fg-3); padding: 0 8px; }
+
+/* EMPTY */
+.empty {
+  grid-column: 1 / -1;
+  padding: 56px 20px; text-align: center;
+  display: flex; flex-direction: column; gap: 8px; align-items: center;
+  border: 1px dashed var(--line); border-radius: var(--radius);
+  background: var(--bg-1);
+}
+.empty-mono { font-size: 10px; color: var(--accent); letter-spacing: 0.18em; margin-bottom: 4px; }
+.empty-title { font-family: var(--font-display); font-size: 20px; font-weight: 500; }
+.empty-sub { color: var(--fg-2); font-size: 13px; max-width: 320px; }
+.empty .btn { margin-top: 12px; }
+
+/* ============ SHEET ============ */
+.sheet-root {
+  position: fixed; inset: 0; z-index: 50;
+  background: color-mix(in oklab, var(--bg-0) 70%, transparent);
+  backdrop-filter: blur(8px);
+  animation: fadeIn .24s ease;
+  display: flex; align-items: flex-end; justify-content: center;
+}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.sheet {
+  width: 100%; max-width: 720px;
+  max-height: 92vh;
+  background: var(--bg-1);
+  border-top-left-radius: 22px; border-top-right-radius: 22px;
+  border: 1px solid var(--line);
+  border-bottom: 0;
+  animation: slideUp .32s cubic-bezier(.22,.8,.2,1);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+.sheet-grip-wrap { padding: 10px 0 6px; display: grid; place-items: center; cursor: grab; }
+.sheet-grip-wrap:active { cursor: grabbing; }
+.sheet-grip { width: 44px; height: 4px; border-radius: 2px; background: var(--fg-3); }
+.sheet-close {
+  position: absolute; top: 14px; right: 14px; z-index: 2;
+  width: 36px; height: 36px; display: grid; place-items: center;
+  border-radius: 50%; background: color-mix(in oklab, var(--bg-0) 80%, transparent);
+  backdrop-filter: blur(8px); color: var(--fg-1);
+  border: 1px solid var(--line-soft);
+}
+.sheet-content { overflow-y: auto; padding-bottom: 20px; }
+.sheet-hero {
+  position: relative;
+  height: clamp(200px, 32vh, 300px);
+  background: #000; margin-bottom: 18px; overflow: hidden;
+}
+.sheet-cat {
+  position: absolute; top: 16px; left: 16px;
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 5px 10px; border-radius: 999px;
+  font-size: 10px; letter-spacing: 0.12em;
+  background: var(--accent-soft); color: var(--accent);
+  border: 1px solid color-mix(in oklab, var(--accent) 35%, transparent);
+}
+.sheet-id {
+  position: absolute; top: 16px; right: 56px;
+  font-size: 10px; letter-spacing: 0.14em; color: var(--fg-2);
+  background: color-mix(in oklab, var(--bg-0) 70%, transparent);
+  padding: 5px 10px; border-radius: 6px;
+  border: 1px solid var(--line-soft);
+}
+.sheet-body { padding: 0 24px; }
+.sheet-name {
+  font-family: var(--font-display); font-size: 28px; font-weight: 600;
+  letter-spacing: -0.02em; margin: 0 0 6px; line-height: 1.1;
+}
+.sheet-tag { color: var(--fg-1); font-size: 15px; margin: 0 0 24px; text-wrap: pretty; }
+
+.sheet-price-row {
+  display: flex; justify-content: space-between; align-items: flex-end; gap: 20px;
+  padding: 16px 0 18px; border-top: 1px solid var(--line-soft); border-bottom: 1px solid var(--line-soft);
+}
+.sheet-price-label { font-size: 10px; color: var(--fg-3); letter-spacing: 0.18em; margin-bottom: 6px; }
+.sheet-price { font-size: 26px; font-weight: 600; color: var(--accent); letter-spacing: -0.01em; }
+.sheet-price.muted { color: var(--fg-2); font-size: 22px; }
+.sheet-price-note { color: var(--fg-3); font-size: 11px; text-align: right; max-width: 180px; }
+
+.sheet-specs { padding: 22px 0 16px; }
+.sheet-specs-hdr { font-size: 10px; color: var(--fg-3); letter-spacing: 0.18em; margin-bottom: 12px; }
+.sheet-specs ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 2px; }
+.sheet-specs li {
+  display: grid; grid-template-columns: 28px 1fr; gap: 14px; align-items: baseline;
+  padding: 10px 0; border-bottom: 1px dashed var(--line-soft);
+  font-size: 14px; color: var(--fg-1);
+}
+.sheet-specs li:last-child { border-bottom: 0; }
+.sheet-specs li .mono { font-size: 10px; color: var(--fg-3); letter-spacing: 0.08em; }
+
+.sheet-actions {
+  display: flex; gap: 10px; padding: 16px 24px 24px;
+  border-top: 1px solid var(--line-soft);
+  background: var(--bg-1);
+  position: sticky; bottom: 0;
+}
+.sheet-actions .btn { flex: 1; justify-content: center; }
+
+/* ============ DRAWER ============ */
+.drawer-root {
+  position: fixed; inset: 0; z-index: 40;
+  background: color-mix(in oklab, var(--bg-0) 70%, transparent);
+  backdrop-filter: blur(6px);
+  opacity: 0; pointer-events: none;
+  transition: opacity .24s ease;
+}
+.drawer-root.on { opacity: 1; pointer-events: auto; }
+.drawer {
+  position: absolute; top: 0; bottom: 0;
+  width: min(420px, 88vw);
+  background: var(--bg-0);
+  border-left: 1px solid var(--line);
+  display: flex; flex-direction: column;
+  transform: translateX(100%);
+  transition: transform .32s cubic-bezier(.22,.8,.2,1);
+}
+.drawer-root.left .drawer {
+  left: 0; right: auto;
+  border-left: 0; border-right: 1px solid var(--line);
+  transform: translateX(-100%);
+}
+.drawer-root.right .drawer { right: 0; }
+.drawer-root.on .drawer { transform: translateX(0); }
+.drawer-hdr {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 20px; border-bottom: 1px solid var(--line-soft);
+}
+.drawer-title { font-family: var(--font-display); font-size: 18px; font-weight: 500; letter-spacing: -0.01em; }
+.drawer-body { flex: 1; overflow-y: auto; padding: 20px; }
+.drawer-foot {
+  border-top: 1px solid var(--line-soft);
+  padding: 16px 20px; display: flex; flex-direction: column; gap: 12px;
+  background: var(--bg-1);
+}
+
+/* SETTINGS */
+.settings { display: flex; flex-direction: column; gap: 26px; }
+.settings-block { display: flex; flex-direction: column; gap: 10px; }
+.settings-kicker { font-size: 10px; color: var(--fg-3); letter-spacing: 0.18em; }
+.toggle-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 14px; border-radius: 12px;
+  background: var(--bg-1); border: 1px solid var(--line-soft);
+  gap: 16px;
+}
+.toggle-title { font-size: 14px; font-weight: 500; }
+.toggle-sub { color: var(--fg-2); font-size: 12px; margin-top: 2px; max-width: 240px; }
+
+.switch {
+  width: 48px; height: 28px; border-radius: 14px;
+  background: var(--bg-3); position: relative;
+  transition: background .18s ease; flex-shrink: 0;
+  border: 1px solid var(--line);
+}
+.switch-dot {
+  position: absolute; top: 2px; left: 2px;
+  width: 22px; height: 22px; border-radius: 11px;
+  background: var(--fg-2);
+  transition: all .22s cubic-bezier(.22,.8,.2,1);
+}
+.switch.on { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 14px var(--accent-glow); }
+.switch.on .switch-dot { left: 23px; background: #04140a; }
+
+.seg {
+  display: flex; padding: 4px;
+  background: var(--bg-1); border: 1px solid var(--line-soft);
+  border-radius: 12px;
+}
+.seg-btn {
+  flex: 1; padding: 10px 12px; border-radius: 9px;
+  color: var(--fg-2); font-size: 13px;
+  transition: all .18s ease;
+}
+.seg-btn:hover { color: var(--fg); }
+.seg-btn.on { background: var(--fg); color: var(--bg-0); font-weight: 500; }
+
+.info-line {
+  display: flex; justify-content: space-between; padding: 10px 0;
+  border-bottom: 1px dashed var(--line-soft); font-size: 13px;
+}
+.info-line:last-child { border-bottom: 0; }
+.info-line .mono { font-size: 10px; letter-spacing: 0.1em; }
+.about-copy { color: var(--fg-1); font-size: 13px; margin: 0; line-height: 1.55; }
+
+/* QUOTE */
+.quote-list { display: flex; flex-direction: column; gap: 8px; }
+.quote-item {
+  display: grid; grid-template-columns: 56px 1fr auto;
+  gap: 12px; align-items: center;
+  padding: 10px; border: 1px solid var(--line-soft);
+  border-radius: 12px; background: var(--bg-1);
+}
+.quote-img {
+  width: 56px; height: 56px; border-radius: 8px; overflow: hidden;
+  background: #000;
+}
+.quote-item-body { min-width: 0; }
+.quote-item-cat { font-size: 9.5px; color: var(--accent); letter-spacing: 0.12em; }
+.quote-item-name { font-size: 13px; font-weight: 500; margin: 2px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.quote-item-price { font-size: 12px; color: var(--fg-1); }
+.quote-controls { display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
+.qty {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px; border-radius: 8px;
+  background: var(--bg-2); border: 1px solid var(--line-soft);
+}
+.qty button {
+  width: 22px; height: 22px; display: grid; place-items: center;
+  border-radius: 5px; color: var(--fg-1);
+}
+.qty button:hover { background: var(--bg-3); color: var(--fg); }
+.qty span { min-width: 16px; text-align: center; font-size: 12px; color: var(--fg); }
+.remove {
+  width: 24px; height: 24px; display: grid; place-items: center;
+  border-radius: 6px; color: var(--fg-3);
+}
+.remove:hover { background: color-mix(in oklab, #ff6b6b 20%, transparent); color: #ff9999; }
+
+.quote-foot { gap: 10px; }
+.quote-total {
+  display: flex; justify-content: space-between; align-items: baseline;
+  padding: 8px 2px;
+}
+.quote-total-val { font-size: 20px; color: var(--accent); font-weight: 600; }
+.quote-foot-btns { display: flex; gap: 10px; }
+.clear-all { align-self: center; font-size: 12px; color: var(--fg-3); }
+.clear-all:hover { color: #ff9999; }
+
+/* FAB */
+.fab {
+  position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+  padding: 12px 20px; border-radius: 999px;
+  background: var(--accent); color: #04140a; font-weight: 600;
+  display: inline-flex; align-items: center; gap: 8px;
+  z-index: 20;
+  box-shadow: 0 10px 30px -6px var(--accent-glow), 0 0 0 1px var(--accent);
+  animation: fabIn .32s cubic-bezier(.22,.8,.2,1);
+  font-size: 13px;
+}
+@keyframes fabIn { from { transform: translate(-50%, 20px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
+.fab:hover { transform: translateX(-50%) translateY(-2px); }
+
+/* FLASH */
+.flash {
+  position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
+  padding: 10px 16px; border-radius: 999px;
+  background: var(--bg-2); color: var(--accent);
+  border: 1px solid color-mix(in oklab, var(--accent) 40%, transparent);
+  font-size: 11px; letter-spacing: 0.1em;
+  animation: flashIn .3s ease, fadeOut .3s ease 1.5s forwards;
+  z-index: 60;
+}
+@keyframes flashIn { from { opacity: 0; transform: translate(-50%, 10px); } to { opacity: 1; transform: translate(-50%, 0); } }
+@keyframes fadeOut { to { opacity: 0; } }
+
+/* TWEAKS PANEL */
+.tweaks {
+  position: fixed; bottom: 20px; right: 20px;
+  width: 280px;
+  background: var(--bg-1); border: 1px solid var(--line);
+  border-radius: 14px; padding: 16px;
+  box-shadow: 0 20px 40px -10px rgba(0,0,0,0.6);
+  z-index: 70;
+  display: flex; flex-direction: column; gap: 14px;
+}
+.tweaks-hdr { display: flex; justify-content: space-between; align-items: center; }
+.tweaks-hdr .mono { font-size: 10px; color: var(--accent); letter-spacing: 0.18em; }
+.tweaks-block { display: flex; flex-direction: column; gap: 8px; }
+.tweaks-label { font-size: 9.5px; color: var(--fg-3); letter-spacing: 0.14em; }
+.tweaks-hint { font-size: 10px; color: var(--fg-3); letter-spacing: 0.06em; line-height: 1.5; text-transform: none; font-family: var(--font-ui); }
+
+/* ============ RESPONSIVE ============ */
+@media (max-width: 640px) {
+  .hero { padding: 36px 22px 22px; border-radius: 16px; }
+  .hero-title { font-size: 40px; }
+  .cats-grid { grid-template-columns: repeat(2, 1fr); }
+  .featured-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .feat-card { aspect-ratio: 3/4; }
+  .feat-name { font-size: 13px; }
+  .cat-hdr-title { font-size: 18px; }
+  .grid.density-large { grid-template-columns: repeat(2, 1fr); }
+  .grid.density-medium { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .sheet-name { font-size: 22px; }
+  .sheet-price { font-size: 22px; }
+  .brand-sub { display: none; }
+  .home { padding: 14px 14px 40px; gap: 40px; }
+  .catalog { padding: 6px 14px 20px; }
+  .chips-row { margin: 0 -14px; padding: 0 14px 12px; }
+  .sheet-body { padding: 0 18px; }
+  .sheet-actions { padding: 12px 18px 18px; flex-direction: column; }
+  .hero-meta { grid-template-columns: 1fr 1fr; }
+  .hero-meta > div:last-child { grid-column: 1 / -1; }
+  .tweaks { left: 14px; right: 14px; width: auto; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}
+
+/* real product images */
+.real-img { display: block; width: 100%; height: 100%; object-fit: contain; background: #fff; }
+</style>
+
+<!-- React + Babel desde CDN -->
+<script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<!-- ══════════════════════════════════════════════════ -->
+<!-- DATOS — 66 productos reales RC Domotic             -->
+<!-- ══════════════════════════════════════════════════ -->
+<script type="text/babel">
+// RC Domotic — catálogo real (fuente: base de datos app.py)
+
+const CATEGORIES = [
+  { id: 'domotica',     name: "Domótica Inteligente",        short: "Domótica",   count: 0 },
+  { id: 'cctv',         name: "CCTV y Videovigilancia",      short: "CCTV",       count: 0 },
+  { id: 'audiovideo',   name: "Audio y Video Premium",        short: "Audio/Video",count: 0 },
+  { id: 'teatro',       name: "Teatro en Casa",               short: "Teatro",     count: 0 },
+  { id: 'cerraduras',   name: "Cerraduras Digitales",         short: "Cerraduras", count: 0 },
+  { id: 'videoporteros',name: "Videoporteros",                short: "Porteros",   count: 0 },
+  { id: 'redes',        name: "Redes WiFi y Conectividad",    short: "Redes",      count: 0 },
+  { id: 'servicios',    name: "Instalación y Servicios",      short: "Servicios",  count: 0 },
+];
+
+const PRODUCTS = [
+  // ── DOMÓTICA ──────────────────────────────────────────────────────────────
+  { id:"dom-001", cat:"domotica", name:"Interruptor Orvibo Gris",       tagline:"Interruptor WiFi color gris Orvibo 2-3 circuitos",             price:280000, img:"/uploads/products/DOM-001_interruptor-orvibo-gris.png", specs:["Referencia: DOM-001","Marca: Orvibo","Unidad: Und","Instalación sugerida: $80.000","Soporte post-venta RC Domotic"] },
+  { id:"dom-002", cat:"domotica", name:"Interruptor Orvibo Negro",      tagline:"Interruptor WiFi color negro Orvibo",                          price:270000, img:"/uploads/products/DOM-002_catalogo.png", specs:["Referencia: DOM-002","Marca: Orvibo","Unidad: Und","Instalación sugerida: $80.000","Soporte post-venta RC Domotic"] },
+  { id:"dom-003", cat:"domotica", name:"Pantalla Mixpad Mini",          tagline:"Orvibo Mixpad mini WiFi BT ZigBee Alexa — 2 circuitos",       price:980000, img:"/uploads/products/DOM-003_mixpad-mini.png", specs:["Referencia: DOM-003","Marca: Orvibo","Unidad: Und","Configuración: $200.000","Soporte post-venta RC Domotic"] },
+  { id:"dom-004", cat:"domotica", name:"Pantalla Mixpad Grande",        tagline:"Orvibo Mixpad WiFi BT pantalla grande con Alexa",             price:3250000,img:"/uploads/products/DOM-004_mixpad-grande.png", specs:["Referencia: DOM-004","Marca: Orvibo","Unidad: Und","Configuración: $400.000","Soporte post-venta RC Domotic"] },
+  { id:"dom-005", cat:"domotica", name:"Toma USB Tipo C",               tagline:"Toma corriente con puerto USB-A y USB-C",                      price:75000,  img:"/uploads/products/DOM-005_catalogo.png", specs:["Referencia: DOM-005","Unidad: Und","Instalación sugerida: $90.000","Soporte post-venta RC Domotic"] },
+  { id:"dom-006", cat:"domotica", name:"Toma GFCI Gris",                tagline:"Toma corriente GFCI con protección diferencial — gris",        price:85000,  img:"/uploads/products/DOM-006_catalogo.png", specs:["Referencia: DOM-006","Unidad: Und","Instalación sugerida: $90.000","Soporte post-venta RC Domotic"] },
+  { id:"dom-007", cat:"domotica", name:"Toma GFCI Negro",               tagline:"Toma corriente GFCI — color negro",                           price:105000, img:"/uploads/products/DOM-007_catalogo.png", specs:["Referencia: DOM-007","Unidad: Und","Instalación sugerida: $90.000","Soporte post-venta RC Domotic"] },
+  { id:"dom-008", cat:"domotica", name:"Toma Naranja",                  tagline:"Toma corriente naranja",                                       price:65000,  img:"/uploads/products/DOM-008_catalogo.png", specs:["Referencia: DOM-008","Unidad: Und","Instalación sugerida: $90.000","Soporte post-venta RC Domotic"] },
+  { id:"dom-009", cat:"domotica", name:"Relay Micro Orvibo",            tagline:"Micro relay multifuncional: cortinas, contacto seco",          price:345000, img:"/uploads/products/DOM-009_relay-multifuncional.png", specs:["Referencia: DOM-009","Marca: Orvibo","Unidad: Und","Soporte post-venta RC Domotic"] },
+  { id:"dom-010", cat:"domotica", name:"Control TV Magic Dot",          tagline:"WiFi Remote Control Magic Dot 5V IR/RF",                       price:85000,  img:"/uploads/products/DOM-010_magic-dot.jpg", specs:["Referencia: DOM-010","Unidad: Und","Protocolo: IR + RF","Soporte post-venta RC Domotic"] },
+  { id:"dom-011", cat:"domotica", name:"Hub Control Orvibo",            tagline:"Hub central del sistema domótico Orvibo",                     price:380000, img:"/uploads/products/DOM-011_hub-orvibo.jpg", specs:["Referencia: DOM-011","Marca: Orvibo","Unidad: Und","Configuración: $150.000","Soporte post-venta RC Domotic"] },
+  { id:"dom-012", cat:"domotica", name:"Enchufe Inalámbrico",           tagline:"Cargador inalámbrico 15W — 4 salidas CA + USB A/C 20W",       price:450000, img:"/uploads/products/DOM-012_catalogo.png", specs:["Referencia: DOM-012","Unidad: Und","Potencia: 15W inalámbrico","Soporte post-venta RC Domotic"] },
+  { id:"dom-013", cat:"domotica", name:"Control Universal Pro",         tagline:"Control remoto universal todo en uno — IR y RF Hub",          price:420000, img:"/uploads/products/DOM-013_catalogo.png", specs:["Referencia: DOM-013","Unidad: Und","Protocolo: IR + RF","Soporte post-venta RC Domotic"] },
+  { id:"dom-014", cat:"domotica", name:"Dimmer WiFi D1",                tagline:"Dimmer US WiFi Switch D1 — control de intensidad",             price:380000, img:"/uploads/products/DOM-014_catalogo.png", specs:["Referencia: DOM-014","Unidad: Und","Instalación sugerida: $80.000","Soporte post-venta RC Domotic"] },
+  { id:"dom-015", cat:"domotica", name:"Sensor Presencia Orvibo",       tagline:"Orvibo — sensor de detección de presencia humana",            price:290000, img:"/uploads/products/DOM-015_sensor-presencia-orvibo.png", specs:["Referencia: DOM-015","Marca: Orvibo","Unidad: Und","Soporte post-venta RC Domotic"] },
+  { id:"dom-016", cat:"domotica", name:"Controlador Cortinas RM4",      tagline:"Hub RM4 Pro para control de cortinas WiFi",                    price:220000, img:"/uploads/products/DOM-016_catalogo.png", specs:["Referencia: DOM-016","Unidad: Und","Instalación sugerida: $80.000","Soporte post-venta RC Domotic"] },
+  { id:"dom-017", cat:"domotica", name:"Alexa Echo Spot",               tagline:"Amazon Alexa Echo Spot con pantalla 5\"",                      price:340000, img:"/uploads/products/DOM-017_catalogo.png", specs:["Referencia: DOM-017","Marca: Amazon","Unidad: Und","Pantalla: 5 pulgadas","Soporte post-venta RC Domotic"] },
+  { id:"dom-018", cat:"domotica", name:"Batería Echo Spot",             tagline:"Base batería 5000 mAh para Alexa Echo Spot",                  price:210000, img:"/uploads/products/DOM-018_catalogo.png", specs:["Referencia: DOM-018","Capacidad: 5000 mAh","Unidad: Und","Soporte post-venta RC Domotic"] },
+  { id:"dom-019", cat:"domotica", name:"Cargador Baterías AA/AAA",      tagline:"Cargador USB de alta velocidad para pilas AA/AAA",             price:75000,  img:"/uploads/products/DOM-019_catalogo.png", specs:["Referencia: DOM-019","Unidad: Und","Soporte post-venta RC Domotic"] },
+  { id:"dom-020", cat:"domotica", name:"Baterías Litio Recargable",     tagline:"Paquete baterías litio recargables AA/AAA",                   price:170000, img:"/uploads/products/DOM-020_catalogo.png", specs:["Referencia: DOM-020","Unidad: Und","Soporte post-venta RC Domotic"] },
+
+  // ── CERRADURAS ────────────────────────────────────────────────────────────
+  { id:"cek-001", cat:"cerraduras", name:"Cerradura Digital Huella",       tagline:"Cerradura con huella digital y llaves de respaldo",         price:250000,  img:"/uploads/products/CEK-001_cerradura-digital-huella_amazon.jpg", specs:["Referencia: CEK-001","Unidad: Und","Instalación sugerida: $80.000","Soporte post-venta RC Domotic"] },
+  { id:"cek-002", cat:"cerraduras", name:"Cerradura C220",                 tagline:"Cerradura digital C220 — app inteligente y PIN",            price:945000,  img:"/uploads/products/CEK-002_catalogo.png", specs:["Referencia: CEK-002","Modelo: C220","Unidad: Und","Instalación sugerida: $80.000","Soporte post-venta RC Domotic"] },
+  { id:"cek-003", cat:"cerraduras", name:"Cerradura Gerencia Venas",       tagline:"Cerradura biométrica por reconocimiento de venas",          price:1050000, img:"/uploads/products/CEK-003_catalogo.png", specs:["Referencia: CEK-003","Biométrica: venas","Unidad: Und","Instalación sugerida: $80.000","Soporte post-venta RC Domotic"] },
+  { id:"cek-004", cat:"cerraduras", name:"Botón Salida No Touch",          tagline:"Botón de salida sin contacto — higiénico y preciso",        price:120000,  img:"/uploads/products/CEK-004_catalogo.png", specs:["Referencia: CEK-004","Unidad: Und","Instalación sugerida: $50.000","Soporte post-venta RC Domotic"] },
+  { id:"cek-005", cat:"cerraduras", name:"Terminal Reconocimiento Facial", tagline:"Terminal biométrica de acceso por reconocimiento facial",   price:650000,  img:"/uploads/products/CEK-005_catalogo.png", specs:["Referencia: CEK-005","Biométrica: facial","Unidad: Und","Instalación sugerida: $100.000","Soporte post-venta RC Domotic"] },
+
+  // ── VIDEOPORTEROS ─────────────────────────────────────────────────────────
+  { id:"cek-006", cat:"videoporteros", name:"Video Portero IP",           tagline:"Sistema de Video Portero IP completo — incluye instalación",  price:4562930, img:"/uploads/products/CEK-006_catalogo.png", specs:["Referencia: CEK-006","Unidad: Servicio completo","Instalación: $150.000","Soporte post-venta RC Domotic"] },
+
+  // ── CCTV ──────────────────────────────────────────────────────────────────
+  { id:"cam-001", cat:"cctv", name:"Cámara 360 Interior 2K",             tagline:"Cámara inalámbrica 360° 2K + 6MP — 2.4/5 GHz interior",     price:880000,  img:"/uploads/products/CAM-001_local.jpg", specs:["Referencia: CAM-001","Resolución: 2K + 6MP","Banda: 2.4/5 GHz","Instalación sugerida: $100.000","Soporte post-venta RC Domotic"] },
+  { id:"cam-002", cat:"cctv", name:"Cámara 360 Ojo de Pez",             tagline:"Cámara 360° ojo de pez WiFi para interiores",                price:660000,  img:"/uploads/products/CAM-002_amazon.jpg", specs:["Referencia: CAM-002","Ángulo: 360°","Conectividad: WiFi","Instalación sugerida: $100.000","Soporte post-venta RC Domotic"] },
+  { id:"cam-003", cat:"cctv", name:"Cámara Exterior 16MP",              tagline:"Cámara WiFi 16MP ultra gran angular 180° Duo",               price:1250000, img:"/uploads/products/CAM-003_camara-exterior-16mp_amazon.jpg", specs:["Referencia: CAM-003","Resolución: 16MP","Ángulo: 180° ultra wide","Instalación sugerida: $100.000","Soporte post-venta RC Domotic"] },
+  { id:"cam-004", cat:"cctv", name:"Cámara Bala 4K WiFi 6",            tagline:"Cámara exterior tipo bala 4K — WiFi 6 — IP66",               price:380000,  img:"/uploads/products/CAM-004_camara-bala-4k-wifi-6_amazon.jpg", specs:["Referencia: CAM-004","Resolución: 4K","WiFi 6","Protección: IP66","Instalación sugerida: $100.000","Soporte post-venta RC Domotic"] },
+  { id:"cam-005", cat:"cctv", name:"Cámara Lumios 2K WiFi 6",          tagline:"Cámara Lumios 1080P exterior con foco integrado WiFi",       price:280000,  img:"/uploads/products/CAM-005_camara-lumios-2k-wifi-6_amazon.jpg", specs:["Referencia: CAM-005","Resolución: 1080P","Foco integrado","Instalación sugerida: $100.000","Soporte post-venta RC Domotic"] },
+  { id:"cam-006", cat:"cctv", name:"NVR 8 Canales WiFi",               tagline:"Sistema NVR grabación continua — 8 cámaras WiFi",            price:1400000, img:"/uploads/products/CAM-006_catalogo.png", specs:["Referencia: CAM-006","Canales: 8","Conectividad: WiFi","Configuración: $200.000","Soporte post-venta RC Domotic"] },
+  { id:"cam-007", cat:"cctv", name:"NVR 12 Canales WiFi 6 — 2TB",     tagline:"Reolink NVR 12 canales WiFi 6 — disco 2TB 24/7",            price:1450000, img:"/uploads/products/CAM-007_catalogo.png", specs:["Referencia: CAM-007","Marca: Reolink","Canales: 12","Almacenamiento: 2TB","Configuración: $200.000","Soporte post-venta RC Domotic"] },
+  { id:"cam-008", cat:"cctv", name:"Cámara Solar 8MP 180° Doble Lente",tagline:"Cámara solar 4K inalámbrica exterior — doble lente 180°",    price:889000,  img:"/uploads/products/CAM-008_catalogo.png", specs:["Referencia: CAM-008","Resolución: 8MP (4K)","Ángulo: 180° doble lente","Solar","Instalación sugerida: $100.000","Configuración: $50.000","Soporte post-venta RC Domotic"] },
+
+  // ── REDES ─────────────────────────────────────────────────────────────────
+  { id:"red-001", cat:"redes", name:"Deco BE3000 WiFi 7 Interior",      tagline:"TP-Link Deco BE3000 WiFi 7 — unidad interior",               price:860000,  img:"/uploads/products/RED-001_deco-be3000-wifi-7-interior_amazon.jpg", specs:["Referencia: RED-001","Marca: TP-Link","Estándar: WiFi 7","Instalación sugerida: $50.000","Configuración: $100.000","Soporte post-venta RC Domotic"] },
+  { id:"red-002", cat:"redes", name:"Deco X55 WiFi 7 M5",               tagline:"TP-Link Deco X55 WiFi 7 M5 — alta velocidad mesh",           price:425000,  img:"/uploads/products/RED-002_catalogo.png", specs:["Referencia: RED-002","Marca: TP-Link","Modelo: X55 M5","Estándar: WiFi 7","Instalación sugerida: $50.000","Configuración: $100.000","Soporte post-venta RC Domotic"] },
+  { id:"red-003", cat:"redes", name:"Deco WiFi 6 Doble Banda",          tagline:"Unidad extensora WiFi 6 doble banda — sistema mesh",         price:290000,  img:"/uploads/products/RED-003_deco-wifi6-doble-banda.jpg", specs:["Referencia: RED-003","Estándar: WiFi 6","Banda: dual","Instalación sugerida: $50.000","Configuración: $100.000","Soporte post-venta RC Domotic"] },
+  { id:"red-004", cat:"redes", name:"Switch Ethernet 8 Puertos",        tagline:"Switch de red Ethernet — 8 puertos",                         price:140000,  img:"/uploads/products/RED-004_catalogo.png", specs:["Referencia: RED-004","Puertos: 8","Unidad: Und","Instalación sugerida: $50.000","Soporte post-venta RC Domotic"] },
+  { id:"red-005", cat:"redes", name:"Soporte Pared Deco Interior",      tagline:"Soporte de pared para Decos internet — interior",            price:180000,  img:"/uploads/products/RED-005_catalogo.png", specs:["Referencia: RED-005","Unidad: Und","Soporte post-venta RC Domotic"] },
+  { id:"red-006", cat:"redes", name:"Soporte Deco Interior (small)",    tagline:"Soporte pequeño para Decos internet interior",               price:75000,   img:"/uploads/products/RED-006_catalogo.png", specs:["Referencia: RED-006","Unidad: Und","Soporte post-venta RC Domotic"] },
+  { id:"red-007", cat:"redes", name:"Extensor Red Internet",            tagline:"Extensor de red internet WiFi",                              price:75000,   img:"/uploads/products/RED-007_catalogo.png", specs:["Referencia: RED-007","Unidad: Und","Instalación sugerida: $50.000","Soporte post-venta RC Domotic"] },
+  { id:"red-008", cat:"redes", name:"Soporte Antena Starlink Mini",     tagline:"Soporte Starlink Mini 2025 — aluminio ajustable 360°",       price:938000,  img:"/uploads/products/RED-008_catalogo.png", specs:["Referencia: RED-008","Versión: Starlink Mini 2025","Material: aleación de aluminio","Rotación: 360°","Instalación sugerida: $100.000","Configuración: $50.000","Soporte post-venta RC Domotic"] },
+  { id:"otr-001", cat:"redes", name:"Tapita Cat6 Negra",                tagline:"Placa de pared Ethernet negra Cat6 — certificación UL",      price:29700,   img:"/uploads/products/OTR-001_catalogo.png", specs:["Referencia: OTR-001","Categoría: Cat6","Color: negro","Certificación: UL","Soporte post-venta RC Domotic"] },
+
+  // ── AUDIO / VIDEO ─────────────────────────────────────────────────────────
+  { id:"av-001", cat:"audiovideo", name:"Amplificador WiiM",             tagline:"WiiM Amp — multihabitación, AirPlay, Alexa",                 price:2550000, img:"/uploads/products/AV-001_amplificador-wiim_amazon.jpg", specs:["Referencia: AV-001","Marca: WiiM","Función: multiroom","AirPlay · Alexa","Configuración: $150.000","Soporte post-venta RC Domotic"] },
+  { id:"av-002", cat:"audiovideo", name:"Amplificador WiiM Amp Ultra",   tagline:"WiiM Amp Ultra 100W — voz, AirPlay, Spotify",               price:3150000, img:"/uploads/products/AV-002_amplificador-wiim-amp-ultra_amazon.jpg", specs:["Referencia: AV-002","Marca: WiiM","Potencia: 100W","AirPlay · Spotify","Configuración: $200.000","Soporte post-venta RC Domotic"] },
+  { id:"av-003", cat:"audiovideo", name:"Parlante Klipsch Empotrado",    tagline:"Parlante empotrado de techo Klipsch 5.25\"",                  price:770000,  img:"/uploads/products/AV-003_catalogo.png", specs:["Referencia: AV-003","Marca: Klipsch","Tamaño: 5.25\"","Instalación: empotrado en techo","Instalación sugerida: $150.000","Soporte post-venta RC Domotic"] },
+  { id:"av-004", cat:"audiovideo", name:"Parlante Pyle Sala de Juntas",  tagline:"Parlante Pyle de techo para sala de juntas",                 price:850000,  img:"/uploads/products/AV-004_catalogo.png", specs:["Referencia: AV-004","Marca: Pyle","Uso: sala de juntas","Instalación sugerida: $150.000","Soporte post-venta RC Domotic"] },
+  { id:"av-005", cat:"audiovideo", name:"Parlante Sala Central",         tagline:"Parlante sala central — audio ambiente",                     price:535000,  img:"/uploads/products/AV-005_catalogo.png", specs:["Referencia: AV-005","Unidad: Und","Instalación sugerida: $150.000","Soporte post-venta RC Domotic"] },
+  { id:"av-006", cat:"audiovideo", name:"Parlante Exterior Impermeable", tagline:"Altavoz exterior 4.5\" 80W — IP65 impermeable",              price:657000,  img:"/uploads/products/AV-006_catalogo.png", specs:["Referencia: AV-006","Potencia: 80W","Protección: IP65","Tamaño: 4.5\"","Instalación sugerida: $150.000","Soporte post-venta RC Domotic"] },
+  { id:"av-007", cat:"audiovideo", name:"Bocina Techo 5.25\"",           tagline:"Bocina de techo 5.25\" — audio ambiente",                    price:568000,  img:"/uploads/products/AV-007_local.jpg", specs:["Referencia: AV-007","Tamaño: 5.25\"","Instalación: empotrado","Instalación sugerida: $150.000","Soporte post-venta RC Domotic"] },
+  { id:"av-010", cat:"audiovideo", name:"Receptor Sala de Juntas",       tagline:"Receptor estéreo M19-BT — amplificador alta fidelidad",      price:0,       img:"/uploads/products/AV-010_catalogo.png", specs:["Referencia: AV-010","Modelo: M19-BT","Uso: sala de juntas","Configuración: $200.000","Soporte post-venta RC Domotic"] },
+  { id:"av-011", cat:"audiovideo", name:"Micrófono Conferencia 8 en 1", tagline:"Micrófono altavoz de conferencia 8 en 1",                    price:745000,  img:"/uploads/products/AV-011_catalogo.png", specs:["Referencia: AV-011","Función: conferencia","8 en 1","Soporte post-venta RC Domotic"] },
+
+  // ── TEATRO EN CASA ────────────────────────────────────────────────────────
+  { id:"av-008", cat:"teatro", name:"Subwoofer Polk",                    tagline:"Subwoofer 10\" clase D 100W — Dolby Atmos",                  price:2490000, img:"/uploads/products/AV-008_catalogo.png", specs:["Referencia: AV-008","Marca: Polk","Diámetro: 10\"","Potencia: 100W clase D","Dolby Atmos","Soporte post-venta RC Domotic"] },
+  { id:"av-009", cat:"teatro", name:"Receptor AV 7.2 Canales",          tagline:"Receptor AV 7.2ch 80W 8K HDMI — Dolby HEOS",                price:4350000, img:"/uploads/products/AV-009_catalogo.png", specs:["Referencia: AV-009","Canales: 7.2","Potencia: 80W","8K HDMI","Dolby · HEOS","Configuración: $200.000","Soporte post-venta RC Domotic"] },
+  { id:"av-012", cat:"teatro", name:"Telón Proyector 100\"",             tagline:"Pantalla proyector motorizada 100 pulgadas",                 price:1050000, img:"/uploads/products/AV-012_catalogo.png", specs:["Referencia: AV-012","Tamaño: 100\"","Motorizada","Instalación sugerida: $200.000","Soporte post-venta RC Domotic"] },
+  { id:"av-013", cat:"teatro", name:"Proyector Optoma 4K",              tagline:"Optoma proyector 4K HD — alto brillo, 3D, HDR",              price:5325100, img:"/uploads/products/AV-013_catalogo.png", specs:["Referencia: AV-013","Marca: Optoma","Resolución: 4K","3D · HDR","Instalación sugerida: $200.000","Soporte post-venta RC Domotic"] },
+  { id:"av-014", cat:"teatro", name:"Ascensor Proyector Motorizado",    tagline:"Accesorio ascensor motorizado para proyector",               price:3870000, img:"/uploads/products/AV-014_local.jpg", specs:["Referencia: AV-014","Función: descenso motorizado","Instalación sugerida: $200.000","Soporte post-venta RC Domotic"] },
+  { id:"av-015", cat:"teatro", name:"Cable RCA 50 pies",                tagline:"Cable subwoofer 50ft — RCA a RCA",                           price:265000,  img:"/uploads/products/AV-015_local.jpg", specs:["Referencia: AV-015","Longitud: 50ft (≈15m)","Tipo: RCA a RCA","Soporte post-venta RC Domotic"] },
+  { id:"av-016", cat:"teatro", name:"Cable HDMI 8K 25ft",               tagline:"Cable HDMI 8K 48Gbps versión 2.1",                           price:280000,  img:"/uploads/products/AV-016_local.webp", specs:["Referencia: AV-016","Estándar: HDMI 2.1","Ancho de banda: 48Gbps","8K","Longitud: 25ft (≈7.6m)","Soporte post-venta RC Domotic"] },
+  { id:"av-017", cat:"teatro", name:"Fire TV Stick 4K Max",             tagline:"Amazon Fire TV Stick 4K Max — streaming premium",            price:205000,  img:"/uploads/products/AV-017_local.jpg", specs:["Referencia: AV-017","Marca: Amazon","Resolución: 4K Max","Streaming","Soporte post-venta RC Domotic"] },
+
+  // ── SERVICIOS ─────────────────────────────────────────────────────────────
+  { id:"mo-001", cat:"servicios", name:"Instalación Cámaras",          tagline:"Instalación física de cámara — incluye fijación",            price:100000, img:"/uploads/products/MO-001_servicio.png", specs:["Referencia: MO-001","Unidad: por cámara","Soporte post-venta RC Domotic"] },
+  { id:"mo-002", cat:"servicios", name:"Instalación Interruptores",    tagline:"Instalación de interruptor domótico",                        price:80000,  img:"/uploads/products/MO-002_servicio.png", specs:["Referencia: MO-002","Unidad: por interruptor","Soporte post-venta RC Domotic"] },
+  { id:"mo-003", cat:"servicios", name:"Instalación Tomas",            tagline:"Instalación de toma corriente",                              price:90000,  img:"/uploads/products/MO-003_servicio.png", specs:["Referencia: MO-003","Unidad: por toma","Soporte post-venta RC Domotic"] },
+  { id:"mo-004", cat:"servicios", name:"Instalación Decos / Red",      tagline:"Instalación de dispositivo de red o Deco",                   price:50000,  img:"/uploads/products/MO-004_servicio.png", specs:["Referencia: MO-004","Unidad: por dispositivo","Soporte post-venta RC Domotic"] },
+  { id:"mo-005", cat:"servicios", name:"Configuración Sistema",        tagline:"Configuración y programación del sistema completo",          price:0,      img:"/uploads/products/MO-005_servicio.png", specs:["Referencia: MO-005","Unidad: Servicio","Precio: a cotizar según alcance","Soporte post-venta RC Domotic"] },
+  { id:"mo-006", cat:"servicios", name:"Montaje y Cableado Completo",  tagline:"Montaje, cableado, instalación y configuración total",       price:0,      img:"/uploads/products/MO-006_servicio.png", specs:["Referencia: MO-006","Unidad: Servicio","Precio: a cotizar según proyecto","Soporte post-venta RC Domotic"] },
+];
+
+CATEGORIES.forEach(c => { c.count = PRODUCTS.filter(p => p.cat === c.id).length; });
+window.CATEGORIES = CATEGORIES;
+window.PRODUCTS   = PRODUCTS;
+</script>
+
+<!-- ══════════════════════════════════════════════════ -->
+<!-- ICONOS                                             -->
+<!-- ══════════════════════════════════════════════════ -->
+<script type="text/babel">
+const Icon = ({ path, size = 20, stroke = 1.6 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+       stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" strokeLinejoin="round">
+    {path}
+  </svg>
+);
+
+const IconSearch   = (p) => <Icon {...p} path={<><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></>}/>;
+const IconClose    = (p) => <Icon {...p} path={<><path d="M6 6l12 12M18 6 6 18"/></>}/>;
+const IconMenu     = (p) => <Icon {...p} path={<><path d="M4 6h16M4 12h16M4 18h16"/></>}/>;
+const IconArrow    = (p) => <Icon {...p} path={<><path d="M5 12h14M13 6l6 6-6 6"/></>}/>;
+const IconBack     = (p) => <Icon {...p} path={<><path d="M19 12H5M11 6l-6 6 6 6"/></>}/>;
+const IconPlus     = (p) => <Icon {...p} path={<><path d="M12 5v14M5 12h14"/></>}/>;
+const IconMinus    = (p) => <Icon {...p} path={<><path d="M5 12h14"/></>}/>;
+const IconCheck    = (p) => <Icon {...p} path={<><path d="M5 12l5 5L20 7"/></>}/>;
+const IconCart     = (p) => <Icon {...p} path={<><path d="M3 4h2l2.5 12h12L22 7H7"/><circle cx="10" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/></>}/>;
+const IconWhatsapp = ({ size = 20 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
+    <path d="M17.5 14.4c-.3-.15-1.77-.87-2.04-.97-.27-.1-.47-.15-.67.15-.2.3-.77.97-.95 1.17-.17.2-.35.22-.65.07-.3-.15-1.26-.47-2.4-1.48-.89-.79-1.49-1.77-1.66-2.07-.17-.3-.02-.46.13-.61.14-.13.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.02-.52-.07-.15-.67-1.62-.92-2.22-.24-.58-.49-.5-.67-.51l-.57-.01c-.2 0-.52.07-.79.37-.27.3-1.04 1.02-1.04 2.48s1.07 2.88 1.22 3.08c.15.2 2.1 3.2 5.08 4.49.71.31 1.26.49 1.7.63.71.23 1.36.2 1.87.12.57-.09 1.77-.72 2.02-1.42.25-.7.25-1.29.17-1.42-.07-.13-.27-.2-.57-.35zM12.05 21.5h-.04c-1.8 0-3.57-.48-5.11-1.4l-.37-.22-3.8 1 1.02-3.71-.24-.38a9.45 9.45 0 0 1-1.46-5.08c0-5.23 4.27-9.5 9.52-9.5 2.54 0 4.93.99 6.72 2.78a9.44 9.44 0 0 1 2.78 6.73c-.01 5.24-4.27 9.5-9.52 9.5zm8.1-17.6A11.43 11.43 0 0 0 12.05 1C5.7 1 .56 6.14.56 12.49c0 2.03.53 4.01 1.54 5.76L.5 24.09l5.98-1.57a11.43 11.43 0 0 0 5.48 1.4h.01c6.34 0 11.49-5.15 11.49-11.5 0-3.07-1.2-5.96-3.36-8.13z"/>
+  </svg>
+);
+const IconTrash    = (p) => <Icon {...p} path={<><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></>}/>;
+const IconDot      = (p) => <Icon {...p} path={<><circle cx="12" cy="12" r="3"/></>} stroke={0}/>;
+
+const IconDomotica = ({ size = 28 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round">
+    <path d="M4 11 12 4l8 7v8a1 1 0 0 1-1 1h-4v-6h-6v6H5a1 1 0 0 1-1-1z"/>
+    <circle cx="12" cy="13" r="1.3" fill="currentColor"/>
+  </svg>
+);
+const IconCCTV = ({ size = 28 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round">
+    <rect x="3" y="7" width="14" height="7" rx="1"/>
+    <path d="M17 9l4-1.5v8L17 14M8 14v4h5"/>
+    <circle cx="6.5" cy="10.5" r="1" fill="currentColor"/>
+  </svg>
+);
+const IconAudioVideo = ({ size = 28 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round">
+    <rect x="3" y="5" width="18" height="11" rx="1.5"/>
+    <path d="M8 20h8M12 16v4"/>
+    <circle cx="12" cy="10.5" r="2" fill="currentColor" opacity=".35"/>
+  </svg>
+);
+const IconTeatro = ({ size = 28 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round">
+    <path d="M3 6h18l-1 3H4z"/>
+    <path d="M5 9v10h3v-4h8v4h3V9"/>
+  </svg>
+);
+const IconCerradura = ({ size = 28 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round">
+    <rect x="5" y="10" width="14" height="10" rx="1.5"/>
+    <path d="M8 10V7a4 4 0 0 1 8 0v3"/>
+    <circle cx="12" cy="15" r="1.2" fill="currentColor"/>
+  </svg>
+);
+const IconPortero = ({ size = 28 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round">
+    <rect x="6" y="3" width="12" height="18" rx="1.5"/>
+    <circle cx="12" cy="9" r="2"/>
+    <path d="M10 14h4M9.5 17h5"/>
+  </svg>
+);
+const IconRedes = ({ size = 28 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round">
+    <path d="M3 12a14 14 0 0 1 18 0M6 15.5a9 9 0 0 1 12 0M9 19a4 4 0 0 1 6 0"/>
+    <circle cx="12" cy="21" r="1.2" fill="currentColor"/>
+  </svg>
+);
+const IconServicios = ({ size = 28 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round">
+    <path d="M14 6l4 4M4 20l6-2 9-9-4-4-9 9-2 6z"/>
+    <path d="M13 7l4 4"/>
+  </svg>
+);
+
+const CAT_ICON = {
+  domotica: IconDomotica, cctv: IconCCTV, audiovideo: IconAudioVideo,
+  teatro: IconTeatro, cerraduras: IconCerradura, videoporteros: IconPortero,
+  redes: IconRedes, servicios: IconServicios,
+};
+
+Object.assign(window, {
+  IconSearch, IconClose, IconMenu, IconArrow, IconBack, IconPlus,
+  IconMinus, IconCheck, IconCart, IconWhatsapp, IconTrash, IconDot, CAT_ICON,
+});
+</script>
+
+<!-- ══════════════════════════════════════════════════ -->
+<!-- PLACEHOLDER                                        -->
+<!-- ══════════════════════════════════════════════════ -->
+<script type="text/babel">
+const ProductPlaceholder = ({ label, sub, tall = false, compact = false }) => {
+  const h = tall ? 420 : (compact ? 120 : 200);
+  const id = React.useMemo(() => `p-${Math.random().toString(36).slice(2, 9)}`, []);
+  return (
+    <svg viewBox={`0 0 400 ${h}`} preserveAspectRatio="xMidYMid slice"
+         style={{ width: '100%', height: '100%', display: 'block' }}>
+      <defs>
+        <pattern id={id} width="14" height="14" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+          <rect width="14" height="14" fill="#0f0f10"/>
+          <line x1="0" y1="0" x2="0" y2="14" stroke="#1a1a1c" strokeWidth="6"/>
+        </pattern>
+        <radialGradient id={`${id}-g`} cx="50%" cy="35%" r="70%">
+          <stop offset="0%" stopColor="rgba(57,255,140,0.08)"/>
+          <stop offset="60%" stopColor="rgba(57,255,140,0)"/>
+        </radialGradient>
+      </defs>
+      <rect width="100%" height="100%" fill={`url(#${id})`}/>
+      <rect width="100%" height="100%" fill={`url(#${id}-g)`}/>
+      {!compact && <>
+        <rect x="14" y={h - 38} width="8" height="8" fill="#39ff8c"/>
+        <text x="30" y={h - 30} fill="#8a8a8c" fontFamily="'JetBrains Mono', monospace"
+              fontSize="10" letterSpacing="0.5">
+          IMG / {label.toUpperCase().slice(0, 24)}
+        </text>
+        {sub && <text x="30" y={h - 16} fill="#4a4a4c" fontFamily="'JetBrains Mono', monospace"
+                      fontSize="9" letterSpacing="0.3">
+          {sub.toUpperCase().slice(0, 32)}
+        </text>}
+      </>}
+      {compact && <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle"
+            fill="#5a5a5c" fontFamily="'JetBrains Mono', monospace" fontSize="9" letterSpacing="0.5">
+        {label.toUpperCase().slice(0, 20)}
+      </text>}
+    </svg>
+  );
+};
+window.ProductPlaceholder = ProductPlaceholder;
+</script>
+
+<!-- ══════════════════════════════════════════════════ -->
+<!-- CARD                                               -->
+<!-- ══════════════════════════════════════════════════ -->
+<script type="text/babel">
+const fmtCOP = (n) => n > 0 ? '$' + n.toLocaleString('es-CO') : 'A consultar';
+
+const ProductImg = ({ product, tall, compact }) => {
+  const cat = CATEGORIES.find(c => c.id === product.cat);
+  if (product.img && product.img.startsWith('http')) {
+    return <img src={product.img} alt={product.name} className="real-img"
+                onError={(e) => { e.target.style.display = 'none'; }}/>;
+  }
+  return <ProductPlaceholder label={product.name} sub={cat ? cat.short : ''} tall={tall} compact={compact}/>;
+};
+
+const ProductCard = ({ product, density, showPrice, onOpen, onAddQuote, inQuote }) => {
+  const cat = CATEGORIES.find(c => c.id === product.cat);
+  if (density === 'list') {
+    return (
+      <button className="card list" onClick={() => onOpen(product)}>
+        <div className="card-img">
+          <ProductImg product={product} compact/>
+        </div>
+        <div className="card-body">
+          <div className="card-cat">{cat ? cat.short : ''}</div>
+          <div className="card-name">{product.name}</div>
+          {showPrice && <div className="card-price mono">{fmtCOP(product.price)}</div>}
+        </div>
+        <div className="card-arrow"><IconArrow size={16}/></div>
+      </button>
+    );
+  }
+  const tall = density === 'large';
+  return (
+    <div className={`card ${density}`}>
+      <button className="card-img-wrap" onClick={() => onOpen(product)}>
+        <div className="card-img">
+          <ProductImg product={product} tall={tall}/>
+        </div>
+        <div className="card-cat-pill"><IconDot size={8}/> {cat ? cat.short : ''}</div>
+      </button>
+      <div className="card-body">
+        <div className="card-name">{product.name}</div>
+        <div className="card-tag">{product.tagline}</div>
+        <div className="card-foot">
+          {showPrice
+            ? <div className="card-price mono">{fmtCOP(product.price)}</div>
+            : <div className="card-price mono muted">Consultar precio</div>}
+          <button className={`quote-btn ${inQuote ? 'on' : ''}`}
+                  onClick={(e) => { e.stopPropagation(); onAddQuote(product); }}
+                  aria-label={inQuote ? 'Quitar de cotización' : 'Agregar a cotización'}>
+            {inQuote ? <IconCheck size={16}/> : <IconPlus size={16}/>}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+window.ProductCard = ProductCard;
+window.fmtCOP = fmtCOP;
+</script>
+
+<!-- ══════════════════════════════════════════════════ -->
+<!-- HOME                                               -->
+<!-- ══════════════════════════════════════════════════ -->
+<script type="text/babel">
+const WHATSAPP = '573123042156';
+const waLink = (msg) => `https://wa.me/${WHATSAPP}?text=${encodeURIComponent(msg)}`;
+
+const Home = ({ onGoCatalog, onPickCategory }) => {
+  const featIds = ['av-013','cek-003','cam-003','dom-004','av-001','cam-008'];
+  const featured = (() => {
+    const picks = PRODUCTS.filter(p => featIds.includes(p.id));
+    if (picks.length >= 4) return picks.slice(0, 4);
+    const extra = []; const seen = new Set(picks.map(p => p.cat));
+    for (const p of PRODUCTS) { if (!seen.has(p.cat)) { extra.push(p); seen.add(p.cat); } if (extra.length >= 4 - picks.length) break; }
+    return [...picks, ...extra].slice(0, 4);
+  })();
+
+  return (
+    <div className="home">
+      <section className="hero">
+        <div className="hero-grid">
+          <div className="hero-row"/><div className="hero-row"/>
+          <div className="hero-row"/><div className="hero-row"/>
+        </div>
+        <div className="hero-content">
+          <div className="hero-eyebrow mono">
+            <span className="pulse"/> CATÁLOGO 2026 · SHOWROOM
+          </div>
+          <h1 className="hero-title">
+            Hogares <em>inteligentes.</em><br/>
+            Espacios <em>premium.</em>
+          </h1>
+          <p className="hero-sub">
+            Domótica, CCTV, audio de referencia y conectividad profesional.
+            Diseño, instalación y mantenimiento.
+          </p>
+          <div className="hero-ctas">
+            <button className="btn primary" onClick={onGoCatalog}>
+              Ver catálogo completo <IconArrow size={16}/>
+            </button>
+            <a className="btn ghost" href={waLink('Hola RC Domotic, quiero asesoría.')} target="_blank" rel="noreferrer">
+              <IconWhatsapp size={16}/> Asesoría directa
+            </a>
+          </div>
+        </div>
+        <div className="hero-meta">
+          <div><span className="mono num">{CATEGORIES.length}</span><span>líneas</span></div>
+          <div><span className="mono num">{PRODUCTS.length}</span><span>referencias</span></div>
+          <div><span className="mono num">24/7</span><span>soporte</span></div>
+        </div>
+      </section>
+
+      <section className="cats">
+        <div className="section-head">
+          <div className="section-kicker mono">/ 01 — LÍNEAS</div>
+          <h2 className="section-title">Nuestras <em>líneas</em> de producto</h2>
+        </div>
+        <div className="cats-grid">
+          {CATEGORIES.map((c, i) => {
+            const Glyph = CAT_ICON[c.id];
+            return (
+              <button key={c.id} className="cat-card" onClick={() => onPickCategory(c.id)}>
+                <div className="cat-num mono">/ {String(i+1).padStart(2,'0')}</div>
+                <div className="cat-glyph">{Glyph && <Glyph size={36}/>}</div>
+                <div className="cat-name">{c.name}</div>
+                <div className="cat-meta mono">{c.count} REFERENCIAS →</div>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="featured">
+        <div className="section-head">
+          <div className="section-kicker mono">/ 02 — DESTACADOS</div>
+          <h2 className="section-title">Piezas de <em>referencia</em></h2>
+        </div>
+        <div className="featured-grid">
+          {featured.map(p => {
+            const cat = CATEGORIES.find(c => c.id === p.cat);
+            return (
+              <button key={p.id} className="feat-card" onClick={() => onPickCategory(p.cat)}>
+                <div className="feat-img">
+                  {p.img && p.img.startsWith('http')
+                    ? <img src={p.img} alt={p.name} style={{width:'100%',height:'100%',objectFit:'cover',background:'#fff'}}/>
+                    : <ProductPlaceholder label={p.name} sub={cat ? cat.short : ''} tall/>}
+                </div>
+                <div className="feat-over">
+                  <div className="feat-cat mono">{cat ? cat.short.toUpperCase() : ''}</div>
+                  <div className="feat-name">{p.name}</div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      <footer className="home-foot">
+        <div className="foot-line"/>
+        <div className="foot-row">
+          <div>
+            <div className="mono muted tiny">RC DOMOTIC · {new Date().getFullYear()}</div>
+            <div className="foot-tag">Integración · Diseño · Instalación</div>
+          </div>
+          <a className="btn ghost small" href={waLink('Hola, quiero coordinar una visita.')} target="_blank" rel="noreferrer">
+            <IconWhatsapp size={14}/> Agendar visita
+          </a>
+        </div>
+      </footer>
+    </div>
+  );
+};
+
+window.Home = Home;
+window.WHATSAPP = WHATSAPP;
+window.waLink = waLink;
+</script>
+
+<!-- ══════════════════════════════════════════════════ -->
+<!-- CATALOG                                            -->
+<!-- ══════════════════════════════════════════════════ -->
+<script type="text/babel">
+const Catalog = ({ initialCategory, onOpen, onAddQuote, quoteItems, showPrice, density, onBack }) => {
+  const [q, setQ] = React.useState('');
+  const [cat, setCat] = React.useState(initialCategory || 'all');
+  const [searching, setSearching] = React.useState(false);
+
+  React.useEffect(() => { setCat(initialCategory || 'all'); }, [initialCategory]);
+
+  const filtered = React.useMemo(() => {
+    const qq = q.trim().toLowerCase();
+    return PRODUCTS.filter(p => {
+      if (cat !== 'all' && p.cat !== cat) return false;
+      if (!qq) return true;
+      return p.name.toLowerCase().includes(qq) ||
+             p.tagline.toLowerCase().includes(qq) ||
+             p.specs.some(s => s.toLowerCase().includes(qq));
+    });
+  }, [q, cat]);
+
+  const catName = cat === 'all' ? 'Todas las líneas' : CATEGORIES.find(c => c.id === cat)?.name;
+  const qIds = new Set(quoteItems.map(i => i.id));
+
+  return (
+    <div className="catalog">
+      <div className="cat-search-bar">
+        <div className={`search-wrap ${searching ? 'focused' : ''}`}>
+          <IconSearch size={16}/>
+          <input
+            value={q}
+            onChange={e => setQ(e.target.value)}
+            onFocus={() => setSearching(true)}
+            onBlur={() => setSearching(false)}
+            placeholder="Buscar referencia, marca, especificación…"
+          />
+          {q && <button className="search-clear" onClick={() => setQ('')}><IconClose size={14}/></button>}
+        </div>
+      </div>
+
+      <div className="chips-row">
+        <div className="chips">
+          <button className={`chip ${cat === 'all' ? 'on' : ''}`} onClick={() => setCat('all')}>
+            Todas <span className="chip-count mono">{PRODUCTS.length}</span>
+          </button>
+          {CATEGORIES.map(c => (
+            <button key={c.id} className={`chip ${cat === c.id ? 'on' : ''}`} onClick={() => setCat(c.id)}>
+              {c.short} <span className="chip-count mono">{c.count}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="cat-hdr">
+        <div>
+          <div className="mono kicker">/ {cat === 'all' ? 'CATÁLOGO' : 'LÍNEA'}</div>
+          <div className="cat-hdr-title">{catName}</div>
+        </div>
+        <div className="mono count-badge">
+          {filtered.length} {filtered.length === 1 ? 'referencia' : 'referencias'}
+        </div>
+      </div>
+
+      <div className={`grid density-${density}`}>
+        {filtered.length === 0 && (
+          <div className="empty">
+            <div className="empty-mono mono">// SIN RESULTADOS</div>
+            <div className="empty-title">No encontramos referencias</div>
+            <div className="empty-sub">Intenta con otra palabra o cambia la categoría.</div>
+            <button className="btn ghost small" onClick={() => { setQ(''); setCat('all'); }}>Reiniciar filtros</button>
+          </div>
+        )}
+        {filtered.map(p => (
+          <ProductCard
+            key={p.id}
+            product={p}
+            density={density}
+            showPrice={showPrice}
+            onOpen={onOpen}
+            onAddQuote={onAddQuote}
+            inQuote={qIds.has(p.id)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+};
+window.Catalog = Catalog;
+</script>
+
+<!-- ══════════════════════════════════════════════════ -->
+<!-- DETAIL SHEET                                       -->
+<!-- ══════════════════════════════════════════════════ -->
+<script type="text/babel">
+const DetailSheet = ({ product, onClose, onAddQuote, inQuote, showPrice }) => {
+  const sheetRef = React.useRef(null);
+  const [drag, setDrag] = React.useState(null);
+  const [offset, setOffset] = React.useState(0);
+  const cat = product ? CATEGORIES.find(c => c.id === product.cat) : null;
+
+  React.useEffect(() => {
+    if (product) document.body.style.overflow = 'hidden';
+    else document.body.style.overflow = '';
+    return () => { document.body.style.overflow = ''; };
+  }, [product]);
+
+  const onStart = (e) => { const y = e.touches ? e.touches[0].clientY : e.clientY; setDrag(y); };
+  const onMove  = (e) => { if (drag == null) return; const y = e.touches ? e.touches[0].clientY : e.clientY; setOffset(Math.max(0, y - drag)); };
+  const onEnd   = () => { if (offset > 120) onClose(); setDrag(null); setOffset(0); };
+
+  if (!product) return null;
+
+  const priceStr = product.price > 0 ? fmtCOP(product.price) : null;
+  const waMsg = `Hola RC Domotic, me interesa *${product.name}*${priceStr && showPrice ? ` (${priceStr})` : ''}. ¿Podemos hablar?`;
+
+  return (
+    <div className="sheet-root" onClick={onClose}>
+      <div
+        ref={sheetRef}
+        className="sheet"
+        style={{ transform: `translateY(${offset}px)`, transition: drag ? 'none' : 'transform .32s cubic-bezier(.22,.8,.2,1)' }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="sheet-grip-wrap"
+             onMouseDown={onStart} onMouseMove={onMove} onMouseUp={onEnd} onMouseLeave={onEnd}
+             onTouchStart={onStart} onTouchMove={onMove} onTouchEnd={onEnd}>
+          <div className="sheet-grip"/>
+        </div>
+        <button className="sheet-close" onClick={onClose}><IconClose size={18}/></button>
+        <div className="sheet-content">
+          <div className="sheet-hero">
+            {product.img && product.img.startsWith('http')
+              ? <img src={product.img} alt={product.name} style={{width:'100%',height:'100%',objectFit:'contain',background:'#fff'}}/>
+              : <ProductPlaceholder label={product.name} sub={cat ? cat.short : ''} tall/>}
+            <div className="sheet-cat mono"><IconDot size={8}/> {cat ? cat.name.toUpperCase() : ''}</div>
+            <div className="sheet-id mono">REF · {product.id.toUpperCase()}</div>
+          </div>
+          <div className="sheet-body">
+            <h2 className="sheet-name">{product.name}</h2>
+            <p className="sheet-tag">{product.tagline}</p>
+            {showPrice ? (
+              <div className="sheet-price-row">
+                <div>
+                  <div className="sheet-price-label mono">PRECIO</div>
+                  <div className="sheet-price mono">{priceStr || 'A consultar'}</div>
+                </div>
+                <div className="sheet-price-note">IVA incluido · Instalación según proyecto</div>
+              </div>
+            ) : (
+              <div className="sheet-price-row">
+                <div>
+                  <div className="sheet-price-label mono">PRECIO</div>
+                  <div className="sheet-price muted">A consultar</div>
+                </div>
+                <div className="sheet-price-note">Cotizamos según configuración y alcance</div>
+              </div>
+            )}
+            <div className="sheet-specs">
+              <div className="sheet-specs-hdr mono">ESPECIFICACIONES</div>
+              <ul>
+                {product.specs.map((s, i) => (
+                  <li key={i}>
+                    <span className="mono dim">{String(i+1).padStart(2,'0')}</span>
+                    <span>{s}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+          <div className="sheet-actions">
+            <button className={`btn solid ${inQuote ? 'added' : ''}`} onClick={() => onAddQuote(product)}>
+              {inQuote ? <><IconCheck size={16}/> En cotización</> : <><IconPlus size={16}/> Agregar a cotización</>}
+            </button>
+            <a className="btn primary whatsapp" href={waLink(waMsg)} target="_blank" rel="noreferrer">
+              <IconWhatsapp size={16}/> Consultar por WhatsApp
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+window.DetailSheet = DetailSheet;
+</script>
+
+<!-- ══════════════════════════════════════════════════ -->
+<!-- DRAWERS                                            -->
+<!-- ══════════════════════════════════════════════════ -->
+<script type="text/babel">
+const Drawer = ({ open, side = 'right', onClose, title, children, footer }) => (
+  <div className={`drawer-root ${open ? 'on' : ''} ${side}`} onClick={onClose}>
+    <div className="drawer" onClick={e => e.stopPropagation()}>
+      <div className="drawer-hdr">
+        <div className="drawer-title">{title}</div>
+        <button className="icon-btn" onClick={onClose}><IconClose size={18}/></button>
+      </div>
+      <div className="drawer-body">{children}</div>
+      {footer && <div className="drawer-foot">{footer}</div>}
+    </div>
+  </div>
+);
+
+const SettingsDrawer = ({ open, onClose, showPrice, setShowPrice, density, setDensity }) => (
+  <Drawer open={open} side="left" onClose={onClose} title="Ajustes">
+    <div className="settings">
+      <div className="settings-block">
+        <div className="settings-kicker mono">MODO COMERCIAL</div>
+        <label className="toggle-row">
+          <div>
+            <div className="toggle-title">Mostrar precios</div>
+            <div className="toggle-sub">Activa solo al cotizar. Desactiva frente al cliente.</div>
+          </div>
+          <button className={`switch ${showPrice ? 'on' : ''}`} onClick={() => setShowPrice(!showPrice)}>
+            <span className="switch-dot"/>
+          </button>
+        </label>
+      </div>
+      <div className="settings-block">
+        <div className="settings-kicker mono">DENSIDAD DE CATÁLOGO</div>
+        <div className="seg">
+          {['large', 'medium', 'list'].map(d => (
+            <button key={d} className={`seg-btn ${density === d ? 'on' : ''}`} onClick={() => setDensity(d)}>
+              {d === 'large' ? 'Grande' : d === 'medium' ? 'Media' : 'Lista'}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="settings-block">
+        <div className="settings-kicker mono">CONTACTO</div>
+        <div className="info-line"><span className="mono dim">WHATSAPP</span><span>+57 312 304 2156</span></div>
+        <div className="info-line"><span className="mono dim">VISITAS</span><span>Bogotá · Medellín · Cali</span></div>
+        <div className="info-line"><span className="mono dim">HORARIO</span><span>Lun–Sáb · 8am–7pm</span></div>
+      </div>
+      <div className="settings-block">
+        <div className="settings-kicker mono">ACERCA</div>
+        <p className="about-copy">
+          Integración premium de hogares y espacios inteligentes.
+          Diseño, instalación certificada y mantenimiento.
+        </p>
+      </div>
+    </div>
+  </Drawer>
+);
+
+const QuoteDrawer = ({ open, onClose, items, setItems, showPrice }) => {
+  const total = items.reduce((s, it) => s + it.price * it.qty, 0);
+  const changeQty  = (id, delta) => setItems(items.map(it => it.id === id ? { ...it, qty: Math.max(1, it.qty + delta) } : it));
+  const removeItem = (id) => setItems(items.filter(it => it.id !== id));
+  const clearAll   = () => setItems([]);
+
+  const buildMessage = () => {
+    let m = '*Cotización RC Domotic*\n\n';
+    items.forEach((it, i) => {
+      m += `${String(i+1).padStart(2,'0')}. ${it.name} x${it.qty}`;
+      if (showPrice && it.price > 0) m += ` — ${fmtCOP(it.price * it.qty)}`;
+      m += '\n';
+    });
+    if (showPrice && total > 0) m += `\n*TOTAL estimado:* ${fmtCOP(total)}`;
+    m += '\n\nConfirmar disponibilidad y agendar visita, por favor.';
+    return m;
+  };
+
+  return (
+    <Drawer
+      open={open} side="right" onClose={onClose}
+      title={`Cotización · ${items.length}`}
+      footer={items.length > 0 && (
+        <div className="quote-foot">
+          {showPrice && total > 0 && (
+            <div className="quote-total">
+              <span className="mono dim">TOTAL ESTIMADO</span>
+              <span className="quote-total-val mono">{fmtCOP(total)}</span>
+            </div>
+          )}
+          <div className="quote-foot-btns">
+            <a className="btn primary whatsapp flex" href={waLink(buildMessage())} target="_blank" rel="noreferrer">
+              <IconWhatsapp size={16}/> Enviar por WhatsApp
+            </a>
+          </div>
+          <button className="btn ghost small clear-all" onClick={clearAll}>
+            <IconTrash size={14}/> Vaciar cotización
+          </button>
+        </div>
+      )}
+    >
+      {items.length === 0 ? (
+        <div className="empty">
+          <div className="empty-mono mono">// COTIZACIÓN VACÍA</div>
+          <div className="empty-title">Arma una cotización</div>
+          <div className="empty-sub">Agrega productos desde el catálogo con el botón +. Luego envíala por WhatsApp.</div>
+        </div>
+      ) : (
+        <div className="quote-list">
+          {items.map(it => {
+            const cat = CATEGORIES.find(c => c.id === it.cat);
+            return (
+              <div className="quote-item" key={it.id}>
+                <div className="quote-img"><ProductPlaceholder label={it.name} compact/></div>
+                <div className="quote-item-body">
+                  <div className="quote-item-cat mono">{cat ? cat.short : ''}</div>
+                  <div className="quote-item-name">{it.name}</div>
+                  {showPrice && it.price > 0 && (
+                    <div className="quote-item-price mono">
+                      {fmtCOP(it.price)} <span className="dim">× {it.qty}</span>
+                    </div>
+                  )}
+                </div>
+                <div className="quote-controls">
+                  <div className="qty">
+                    <button onClick={() => changeQty(it.id, -1)}><IconMinus size={12}/></button>
+                    <span className="mono">{it.qty}</span>
+                    <button onClick={() => changeQty(it.id, 1)}><IconPlus size={12}/></button>
+                  </div>
+                  <button className="remove" onClick={() => removeItem(it.id)}><IconTrash size={14}/></button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </Drawer>
+  );
+};
+
+window.SettingsDrawer = SettingsDrawer;
+window.QuoteDrawer    = QuoteDrawer;
+</script>
+
+<!-- ══════════════════════════════════════════════════ -->
+<!-- APP SHELL                                          -->
+<!-- ══════════════════════════════════════════════════ -->
+<script type="text/babel">
+const MARK_SVG = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none"><rect width="64" height="64" rx="14" fill="#0a0a0b"/><rect x="8" y="18" width="42" height="28" rx="4" stroke="#fff" stroke-width="2.4"/><path d="M42 18V12" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/><circle cx="42" cy="10" r="2" fill="#fff"/><text x="14" y="38" font-family="Space Grotesk, sans-serif" font-weight="700" font-size="15" fill="#fff" letter-spacing="0.5">RC</text><path d="M34 36a3.5 3.5 0 0 1 3.5 3.5M31 36a6.5 6.5 0 0 1 6.5 6.5" stroke="#39ff8c" stroke-width="1.8" stroke-linecap="round"/><circle cx="31" cy="42.5" r="1" fill="#39ff8c"/></svg>')}`;
+
+const useLocal = (key, initial) => {
+  const [val, setVal] = React.useState(() => {
+    try { const v = localStorage.getItem(key); return v != null ? JSON.parse(v) : initial; }
+    catch { return initial; }
+  });
+  React.useEffect(() => {
+    try { localStorage.setItem(key, JSON.stringify(val)); } catch {}
+  }, [key, val]);
+  return [val, setVal];
+};
+
+const App = () => {
+  const [route, setRoute]           = useLocal('rc.route',     { name: 'home' });
+  const [showPrice, setShowPrice]   = useLocal('rc.showPrice', false);
+  const [density, setDensity]       = useLocal('rc.density',   'medium');
+  const [detailProduct, setDetail]  = React.useState(null);
+  const [settingsOpen, setSettings] = React.useState(false);
+  const [quoteOpen, setQuoteOpen]   = React.useState(false);
+  const [quoteItems, setQuoteItems] = useLocal('rc.quote', []);
+  const [flash, setFlash]           = React.useState(null);
+
+  const goHome    = () => setRoute({ name: 'home' });
+  const goCatalog = (category) => setRoute({ name: 'catalog', category: category || 'all' });
+
+  const addToQuote = (product) => {
+    const exists = quoteItems.find(i => i.id === product.id);
+    if (exists) { setQuoteItems(quoteItems.filter(i => i.id !== product.id)); showFlash('Quitado de cotización'); }
+    else { setQuoteItems([...quoteItems, { ...product, qty: 1 }]); showFlash('Agregado a cotización'); }
+  };
+  const showFlash = (msg) => {
+    setFlash(msg);
+    clearTimeout(window.__flashT);
+    window.__flashT = setTimeout(() => setFlash(null), 1800);
+  };
+
+  return (
+    <div className="app">
+      <header className="top">
+        <button className="icon-btn" onClick={() => setSettings(true)} aria-label="Ajustes">
+          <IconMenu size={18}/>
+        </button>
+        <button className="brand" onClick={goHome}>
+          <img src={MARK_SVG} alt="RC Domotic" className="brand-logo"/>
+          <div className="brand-stack">
+            <div className="brand-name">RC DOMOTIC</div>
+            <div className="brand-sub mono">CATÁLOGO · SHOWROOM</div>
+          </div>
+        </button>
+        <div className="top-right">
+          {showPrice && <div className="price-indicator mono">$ ON</div>}
+          <button className="icon-btn quote-toggle" onClick={() => setQuoteOpen(true)} aria-label="Cotización">
+            <IconCart size={18}/>
+            {quoteItems.length > 0 && <span className="badge mono">{quoteItems.length}</span>}
+          </button>
+        </div>
+      </header>
+
+      <main className="main">
+        {route.name === 'home' && (
+          <Home onGoCatalog={() => goCatalog('all')} onPickCategory={goCatalog}/>
+        )}
+        {route.name === 'catalog' && (
+          <>
+            <div className="subnav">
+              <button className="link" onClick={goHome}><IconBack size={14}/> Inicio</button>
+              <span className="sep mono">/</span>
+              <span className="mono">CATÁLOGO</span>
+            </div>
+            <Catalog
+              initialCategory={route.category}
+              onOpen={setDetail}
+              onAddQuote={addToQuote}
+              quoteItems={quoteItems}
+              showPrice={showPrice}
+              density={density}
+              onBack={goHome}
+            />
+          </>
+        )}
+      </main>
+
+      <DetailSheet
+        product={detailProduct}
+        onClose={() => setDetail(null)}
+        onAddQuote={addToQuote}
+        inQuote={!!quoteItems.find(i => i.id === detailProduct?.id)}
+        showPrice={showPrice}
+      />
+      <SettingsDrawer
+        open={settingsOpen} onClose={() => setSettings(false)}
+        showPrice={showPrice} setShowPrice={setShowPrice}
+        density={density} setDensity={setDensity}
+      />
+      <QuoteDrawer
+        open={quoteOpen} onClose={() => setQuoteOpen(false)}
+        items={quoteItems} setItems={setQuoteItems}
+        showPrice={showPrice}
+      />
+
+      {quoteItems.length > 0 && !quoteOpen && !detailProduct && (
+        <button className="fab" onClick={() => setQuoteOpen(true)}>
+          <IconCart size={18}/>
+          <span>Ver cotización</span>
+          <span className="mono">· {quoteItems.length}</span>
+        </button>
+      )}
+
+      {flash && <div className="flash mono">{flash}</div>}
+    </div>
+  );
+};
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

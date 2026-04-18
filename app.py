@@ -60,6 +60,23 @@ elif os.path.isdir(_RENDER_DATA_DIR):
 else:
     DATA_DIR = BASE_DIR
 DB_PATH = os.environ.get('DB_PATH', os.path.join(DATA_DIR, 'rc_domotic.db'))
+
+# ── Abstracción de base de datos ─────────────────────────────────────────────
+# Cuando DATABASE_URL esté definido (Postgres en producción), get_db() usa
+# psycopg2. Para migrar: define DATABASE_URL=postgres://... en el entorno.
+_DATABASE_URL = os.environ.get('DATABASE_URL', '').strip()
+_USE_POSTGRES = _DATABASE_URL.startswith('postgres')
+if _USE_POSTGRES:
+    try:
+        import psycopg2, psycopg2.extras
+        _PG_AVAILABLE = True
+    except ImportError:
+        _PG_AVAILABLE = False
+        print("[WARN] DATABASE_URL definido pero psycopg2 no está instalado. Usando SQLite.")
+        _USE_POSTGRES = False
+else:
+    _PG_AVAILABLE = False
+
 UPLOADS_DIR = os.environ.get('UPLOADS_DIR', os.path.join(DATA_DIR, 'uploads'))
 UPLOAD_FOLDER = os.path.join(UPLOADS_DIR, 'products')
 FALLBACK_UPLOAD_FOLDER = os.path.join(BASE_DIR, 'uploads', 'products')
@@ -907,6 +924,11 @@ def ensure_db_ready():
 
 # â”€â”€â”€ DB helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 def get_db():
+    if _USE_POSTGRES:
+        if 'db' not in g:
+            g.db = psycopg2.connect(_DATABASE_URL)
+            g.db.autocommit = False
+        return g.db
     ensure_db_ready()
     if 'db' not in g:
         g.db = sqlite3.connect(DB_PATH)
@@ -4788,8 +4810,15 @@ def public_pdf_no(no):
 
 @app.get('/')
 def serve_index():
-    """Home - Single Page App."""
+    """Home - Single Page App (cotizador interno)."""
     return send_file(os.path.join(BASE_DIR, 'static', 'index.html'))
+
+
+@app.get('/catalog')
+@app.get('/catalogo')
+def serve_catalog():
+    """Catálogo público standalone — para catalogo.rcdomotic.com."""
+    return send_file(os.path.join(BASE_DIR, 'catalog.html'))
 
 
 @app.get('/print/inventario')

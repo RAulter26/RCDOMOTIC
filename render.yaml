@@ -1,0 +1,28 @@
+services:
+  # ── Catálogo público ─────────────────────────────────────────────────────
+  - type: web
+    name: rcdomotic-catalogo
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --timeout 60
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: SECRET_KEY
+        generateValue: true
+      # Cuando tengas Postgres, agrega aquí:
+      # - key: DATABASE_URL
+      #   fromDatabase:
+      #     name: rcdomotic-db
+      #     property: connectionString
+    routes:
+      - type: redirect
+        source: /
+        destination: /catalog
+        # Alternativa: déjalo en / y sirve catalog.html directo desde Flask
+
+  # ── Base de datos (para cuando unifiques) ────────────────────────────────
+  # databases:
+  #   - name: rcdomotic-db
+  #     plan: free
