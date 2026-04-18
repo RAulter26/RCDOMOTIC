@@ -62,21 +62,17 @@ else:
 DB_PATH = os.environ.get('DB_PATH', os.path.join(DATA_DIR, 'rc_domotic.db'))
 
 # ── Abstracción de base de datos ─────────────────────────────────────────────
-# Cuando DATABASE_URL esté definido (Postgres en producción), las funciones
-# get_db() / query() deberán usar psycopg2 en lugar de sqlite3.
-# Por ahora se usa SQLite. Para migrar, reemplaza get_db() por la implementación
-# Postgres sin tocar ningún código de rutas ni lógica de negocio.
+# Cuando DATABASE_URL esté definido (Postgres en producción), get_db() usa
+# psycopg2. Para migrar: define DATABASE_URL=postgres://... en el entorno.
 _DATABASE_URL = os.environ.get('DATABASE_URL', '').strip()
 _USE_POSTGRES = _DATABASE_URL.startswith('postgres')
-
 if _USE_POSTGRES:
     try:
-        import psycopg2
-        import psycopg2.extras
+        import psycopg2, psycopg2.extras
         _PG_AVAILABLE = True
     except ImportError:
         _PG_AVAILABLE = False
-        print("[WARN] DATABASE_URL definido pero psycopg2 no instalado. Usando SQLite.")
+        print("[WARN] DATABASE_URL definido pero psycopg2 no está instalado. Usando SQLite.")
         _USE_POSTGRES = False
 else:
     _PG_AVAILABLE = False
