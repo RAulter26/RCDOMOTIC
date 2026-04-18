@@ -662,6 +662,20 @@ input { font-family: inherit; }
 .client-btns { display: flex; gap: 10px; margin-top: 22px; }
 .client-skip { font-size: 12px; color: var(--fg-3); text-align: center; margin-top: 12px; cursor: pointer; }
 .client-skip:hover { color: var(--fg-1); }
+.datos-check {
+  display: flex; align-items: flex-start; gap: 10px; margin-top: 16px;
+  padding: 12px 14px; border-radius: 9px;
+  background: color-mix(in oklab, var(--accent) 8%, transparent);
+  border: 1px solid color-mix(in oklab, var(--accent) 22%, transparent);
+  cursor: pointer;
+}
+.datos-check input[type=checkbox] {
+  width: 18px; height: 18px; flex-shrink: 0; accent-color: var(--accent);
+  cursor: pointer; margin-top: 1px;
+}
+.datos-check-label { font-size: 12px; color: var(--fg-2); line-height: 1.5; cursor: pointer; }
+.datos-check-label a { color: var(--accent); text-decoration: none; }
+.datos-check-label a:hover { text-decoration: underline; }
 
 /* FAB */
 .fab {
@@ -1424,6 +1438,7 @@ const QuoteDrawer = ({ open, onClose, items, setItems, showPrice }) => {
   const clearAll   = () => setItems([]);
   const [showForm, setShowForm] = React.useState(false);
   const [client, setClient] = React.useState({ name: '', phone: '', email: '' });
+  const [datosOk, setDatosOk] = React.useState(true);
 
   const buildMessage = (c) => {
     let m = '*Solicitud de Cotización — RC Domotic*\n\n';
@@ -1448,7 +1463,7 @@ const QuoteDrawer = ({ open, onClose, items, setItems, showPrice }) => {
       <div className="client-overlay" onClick={e => { if(e.target===e.currentTarget) setShowForm(false); }}>
         <div className="client-card">
           <div className="client-title">¿Quién solicita?</div>
-          <div className="client-sub">Nombre, celular y correo son obligatorios</div>
+          <div className="client-sub">Completa tus datos para enviar la cotización</div>
           <div className="client-field">
             <label>NOMBRE *</label>
             <input placeholder="Tu nombre completo" value={client.name} onChange={e => setClient({...client, name: e.target.value})}/>
@@ -1461,8 +1476,15 @@ const QuoteDrawer = ({ open, onClose, items, setItems, showPrice }) => {
             <label>CORREO *</label>
             <input placeholder="tu@correo.com" type="email" value={client.email} onChange={e => setClient({...client, email: e.target.value})}/>
           </div>
+          <label className="datos-check" onClick={() => setDatosOk(!datosOk)}>
+            <input type="checkbox" checked={datosOk} onChange={e => setDatosOk(e.target.checked)}/>
+            <span className="datos-check-label">
+              Autorizo a RC Domotic el tratamiento de mis datos personales conforme a la
+              Ley 1581 de 2012 para el procesamiento de esta cotización y contacto comercial.
+            </span>
+          </label>
           {(() => {
-            const ok = client.name.trim() && client.phone.trim() && client.email.trim();
+            const ok = client.name.trim() && client.phone.trim() && client.email.trim() && datosOk;
             return (
               <div className="client-btns">
                 <button className="btn ghost" style={{flex:'0 0 auto'}} onClick={() => setShowForm(false)}>Cancelar</button>
@@ -1528,7 +1550,11 @@ const QuoteDrawer = ({ open, onClose, items, setItems, showPrice }) => {
             const cat = CATEGORIES.find(c => c.id === it.cat);
             return (
               <div className="quote-item" key={it.id}>
-                <div className="quote-img"><ProductPlaceholder label={it.name} compact/></div>
+                <div className="quote-img">
+                  {it.img && (it.img.startsWith('http') || it.img.startsWith('/'))
+                    ? <img src={it.img} alt={it.name} style={{width:'100%',height:'100%',objectFit:'contain',background:'#fff',padding:'4px'}}/>
+                    : <ProductPlaceholder label={it.name} compact/>}
+                </div>
                 <div className="quote-item-body">
                   <div className="quote-item-cat mono">{cat ? cat.short : ''}</div>
                   <div className="quote-item-name">{it.name}</div>
